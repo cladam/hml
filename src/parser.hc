@@ -426,14 +426,14 @@ pub fun parse_exponent(s: string, pos: int) : (string, int) {
   (sign + digits_str, p2)
 }
 
-pub fun parse_array(s: string, pos: int, items: list<Hml>) : result<(Hml, int), string> {
+pub fun parse_array(s: string, pos: int, items: list<Hml>, text_elems: list<string>) : result<(Hml, int), string> {
   let p1 = skip_noise(s, pos)
   if peek(s, p1) == "]" { Ok((HArray(items), p1 + 1)) }
   else {
-    match parse_value(s, p1) {
+    match parse_value(s, p1, text_elems) {
       Ok((v, p2)) => {
         let p3 = skip_noise(s, p2)
-        if peek(s, p3) == "," { parse_array(s, p3 + 1, items + [v]) }
+        if peek(s, p3) == "," { parse_array(s, p3 + 1, items + [v], text_elems) }
         else if peek(s, p3) == "]" { Ok((HArray(items + [v]), p3 + 1)) }
         else { Err("expected ',' or ']' in array at position " + show(p3)) }
       },
@@ -471,7 +471,7 @@ pub fun parse_literal_value(s: string, p: int) : result<(Hml, int), string> {
   }
 }
 
-pub fun parse_value(s: string, pos: int) : result<(Hml, int), string> {
+pub fun parse_value(s: string, pos: int, text_elems: list<string>) : result<(Hml, int), string> {
   let p = skip_ws(s, pos)
   if peek(s, p) == "\"" { parse_string_value(s, p) }
   else if peek(s, p) == "\'" { parse_literal_value(s, p) }
@@ -493,8 +493,8 @@ pub fun parse_value(s: string, pos: int) : result<(Hml, int), string> {
   else if starts_with_at(s, p, "nan") && !is_bare_key_char(peek(s, p + 3)) {
     Ok((HFloat(0.0 / 0.0), p + 3))
   }
-  else if peek(s, p) == "[" { parse_array(s, p + 1, []) }
-  else if peek(s, p) == "@" { parse_inline_element(s, p) }
+  else if peek(s, p) == "[" { parse_array(s, p + 1, [], text_elems) }
+  else if peek(s, p) == "@" { parse_inline_element(s, p, text_elems) }
   else if is_digit(peek(s, p)) || peek(s, p) == "+" || peek(s, p) == "-" {
     parse_number_or_duration(s, p)
   }
@@ -560,7 +560,7 @@ pub fun parse_element_name(s: string, pos: int, acc: string) : result<(string, i
   }
 }
 
-pub fun parse_attributes(s: string, pos: int, attrs: list<(string, Hml)>) : result<(list<(string, Hml)>, int), string> {
+pub fun parse_attributes(s: string, pos: int, attrs: list<(string, Hml)>, text_elems: list<string>) : result<(list<(string, Hml)>, int), string> {
   let p1 = skip_noise(s, pos)
   if peek(s, p1) == ")" { Ok((attrs, p1 + 1)) }
   else {
@@ -569,11 +569,11 @@ pub fun parse_attributes(s: string, pos: int, attrs: list<(string, Hml)>) : resu
         let p3 = skip_ws(s, p2)
         if peek(s, p3) == ":" {
           let p4 = skip_ws(s, p3 + 1)
-          match parse_value(s, p4) {
+          match parse_value(s, p4, text_elems) {
             Ok((val, p5)) => {
               let p6 = skip_noise(s, p5)
-              if peek(s, p6) == "," { parse_attributes(s, p6 + 1, attrs + [(key, val)]) }
-              else { parse_attributes(s, p6, attrs + [(key, val)]) }
+              if peek(s, p6) == "," { parse_attributes(s, p6 + 1, attrs + [(key, val)], text_elems) }
+              else { parse_attributes(s, p6, attrs + [(key, val)], text_elems) }
             },
             Err(e) => Err(e)
           }
@@ -581,8 +581,8 @@ pub fun parse_attributes(s: string, pos: int, attrs: list<(string, Hml)>) : resu
         else {
           // Boolean flag (no value)
           let p4 = skip_noise(s, p3)
-          if peek(s, p4) == "," { parse_attributes(s, p4 + 1, attrs + [(key, HBool(true))]) }
-          else { parse_attributes(s, p4, attrs + [(key, HBool(true))]) }
+          if peek(s, p4) == "," { parse_attributes(s, p4 + 1, attrs + [(key, HBool(true))], text_elems) }
+          else { parse_attributes(s, p4, attrs + [(key, HBool(true))], text_elems) }
         }
       },
       Err(e) => Err(e)
@@ -637,12 +637,12 @@ pub fun merge_body_acc(remaining: list<HmlNode>, acc: list<HmlNode>) : list<HmlN
 pub fun merge_body(nodes: list<HmlNode>) : list<HmlNode> =>
   merge_body_acc(nodes, [])
 
-pub fun parse_body(s: string, pos: int, nodes: list<HmlNode>) : result<(list<HmlNode>, int), string> {
+pub fun parse_body(s: string, pos: int, nodes: list<HmlNode>, text_elems: list<string>) : result<(list<HmlNode>, int), string> {
   let p1 = skip_noise(s, pos)
   if peek(s, p1) == "}" { Ok((nodes, p1 + 1)) }
   else if peek(s, p1) == "@" {
-    match parse_element(s, p1) {
-      Ok((elem, p2)) => parse_body(s, p2, nodes + [NElem(elem)]),
+    match parse_element(s, p1, text_elems) {
+      Ok((elem, p2)) => parse_body(s, p2, nodes + [NElem(elem)], text_elems),
       Err(e) => Err(e)
     }
   }
@@ -653,11 +653,11 @@ pub fun parse_body(s: string, pos: int, nodes: list<HmlNode>) : result<(list<Hml
         let p3 = skip_ws(s, p2)
         if peek(s, p3) == ":" {
           let p4 = skip_ws(s, p3 + 1)
-          match parse_value(s, p4) {
+          match parse_value(s, p4, text_elems) {
             Ok((val, p5)) => {
               let new_node = wrap_dotted_value(segments, val)
-              if length(segments) > 1 { parse_body(s, p5, insert_or_merge(nodes, new_node)) }
-              else { parse_body(s, p5, nodes + [new_node]) }
+              if length(segments) > 1 { parse_body(s, p5, insert_or_merge(nodes, new_node), text_elems) }
+              else { parse_body(s, p5, nodes + [new_node], text_elems) }
             },
             Err(e) => Err(e)
           }
@@ -669,7 +669,105 @@ pub fun parse_body(s: string, pos: int, nodes: list<HmlNode>) : result<(list<Hml
   }
 }
 
-pub fun parse_element(s: string, pos: int) : result<(Hml, int), string> {
+pub fun is_text_elem(name: string, text_elems: list<string>) : bool {
+  match text_elems {
+    [] => false,
+    [x, ..rest] => if x == name { true } else { is_text_elem(name, rest) }
+  }
+}
+
+pub fun collect_text_run(s: string, pos: int, acc: string, text_elems: list<string>) : (list<HmlNode>, int) {
+  if pos >= str_length(s) { (if acc == "" { [] } else { [NText(acc)] }, pos) }
+  else if peek(s, pos) == "}" { (if acc == "" { [] } else { [NText(acc)] }, pos) }
+  else if peek(s, pos) == "\n" { (if acc == "" { [] } else { [NText(acc)] }, pos + 1) }
+  else if peek(s, pos) == "@" {
+    match try_inline_element(s, pos, text_elems) {
+      Some((elem, p2)) => {
+        let text_nodes = if acc == "" { [] } else { [NText(acc)] }
+        let (rest_nodes, p3) = collect_text_run(s, p2, "", text_elems)
+        (text_nodes + [NElem(elem)] + rest_nodes, p3)
+      },
+      None => collect_text_run(s, pos + 1, acc + "@", text_elems)
+    }
+  }
+  else { collect_text_run(s, pos + 1, acc + peek(s, pos), text_elems) }
+}
+
+pub fun try_inline_element(s: string, pos: int, text_elems: list<string>) : maybe<(Hml, int)> {
+  // Inline elements always have text body. No whitespace skip before '{'.
+  let p1 = pos + 1
+  match parse_element_name(s, p1, "") {
+    Ok((name, p2)) => {
+      if peek(s, p2) == "(" {
+        match parse_attributes(s, p2 + 1, [], text_elems) {
+          Ok((attrs, p3)) => {
+            if peek(s, p3) == "{" {
+              match parse_text_body(s, p3 + 1, [], text_elems) {
+                Ok((body, p4)) => Some((HElement(name, attrs, body), p4)),
+                Err(_) => None
+              }
+            }
+            else { Some((HElement(name, attrs, []), p3)) }
+          },
+          Err(_) => None
+        }
+      }
+      else if peek(s, p2) == "{" {
+        match parse_text_body(s, p2 + 1, [], text_elems) {
+          Ok((body, p3)) => Some((HElement(name, [], body), p3)),
+          Err(_) => None
+        }
+      }
+      else { Some((HElement(name, [], []), p2)) }
+    },
+    Err(_) => None
+  }
+}
+
+pub fun try_text_property(s: string, pos: int, text_elems: list<string>) : maybe<(HmlNode, int)> {
+  match parse_bare_key(s, pos, "") {
+    Ok((key, p2)) => {
+      let p3 = skip_ws(s, p2)
+      if peek(s, p3) == ":" {
+        let p4 = skip_ws(s, p3 + 1)
+        match parse_value(s, p4, text_elems) {
+          Ok((val, p5)) => Some((NProp(key, val), p5)),
+          Err(_) => None
+        }
+      }
+      else { None }
+    },
+    Err(_) => None
+  }
+}
+
+pub fun parse_text_body(s: string, pos: int, nodes: list<HmlNode>, text_elems: list<string>) : result<(list<HmlNode>, int), string> {
+  let p1 = skip_ws(s, pos)
+  if p1 >= str_length(s) { Err("unterminated text body (missing '}')") }
+  else if peek(s, p1) == "}" { Ok((nodes, p1 + 1)) }
+  else if is_newline(peek(s, p1)) { parse_text_body(s, p1 + 1, nodes, text_elems) }
+  else if p1 + 1 < str_length(s) && peek(s, p1) == "/" && peek(s, p1 + 1) == "/" {
+    let p2 = skip_to_eol(s, p1 + 2)
+    parse_text_body(s, p2, nodes, text_elems)
+  }
+  else if peek(s, p1) == "@" {
+    match parse_element(s, p1, text_elems) {
+      Ok((elem, p2)) => parse_text_body(s, p2, nodes + [NElem(elem)], text_elems),
+      Err(e) => Err(e)
+    }
+  }
+  else {
+    match try_text_property(s, p1, text_elems) {
+      Some((prop, p2)) => parse_text_body(s, p2, nodes + [prop], text_elems),
+      None => {
+        let (text_nodes, p2) = collect_text_run(s, p1, "", text_elems)
+        parse_text_body(s, p2, nodes + text_nodes, text_elems)
+      }
+    }
+  }
+}
+
+pub fun parse_element(s: string, pos: int, text_elems: list<string>) : result<(Hml, int), string> {
   // pos should point at '@'
   let p1 = pos + 1
   match parse_element_name(s, p1, "") {
@@ -677,7 +775,7 @@ pub fun parse_element(s: string, pos: int) : result<(Hml, int), string> {
       let p3 = skip_ws(s, p2)
       // Parse optional attributes
       match (if peek(s, p3) == "(" {
-        match parse_attributes(s, p3 + 1, []) {
+        match parse_attributes(s, p3 + 1, [], text_elems) {
           Ok((attrs, p4)) => Ok((attrs, p4)),
           Err(e) => Err(e)
         }
@@ -686,9 +784,17 @@ pub fun parse_element(s: string, pos: int) : result<(Hml, int), string> {
           let p5 = skip_ws(s, p4)
           // Parse optional body
           if peek(s, p5) == "{" {
-            match parse_body(s, p5 + 1, []) {
-              Ok((body, p6)) => Ok((HElement(name, attrs, body), p6)),
-              Err(e) => Err(e)
+            if is_text_elem(name, text_elems) {
+              match parse_text_body(s, p5 + 1, [], text_elems) {
+                Ok((body, p6)) => Ok((HElement(name, attrs, body), p6)),
+                Err(e) => Err(e)
+              }
+            }
+            else {
+              match parse_body(s, p5 + 1, [], text_elems) {
+                Ok((body, p6)) => Ok((HElement(name, attrs, body), p6)),
+                Err(e) => Err(e)
+              }
             }
           }
           else { Ok((HElement(name, attrs, []), p5)) }
@@ -700,28 +806,60 @@ pub fun parse_element(s: string, pos: int) : result<(Hml, int), string> {
   }
 }
 
-pub fun parse_inline_element(s: string, pos: int) : result<(Hml, int), string> =>
-  parse_element(s, pos)
+pub fun parse_inline_element(s: string, pos: int, text_elems: list<string>) : result<(Hml, int), string> =>
+  parse_element(s, pos, text_elems)
+
+pub fun parse_text_names(s: string, pos: int, names: list<string>) : (list<string>, int) {
+  let p1 = skip_ws(s, pos)
+  if p1 >= str_length(s) || is_newline(peek(s, p1)) { (names, p1) }
+  else if peek(s, p1) == "," { parse_text_names(s, p1 + 1, names) }
+  else {
+    match parse_bare_key(s, p1, "") {
+      Ok((name, p2)) => parse_text_names(s, p2, names + [name]),
+      Err(_) => (names, p1)
+    }
+  }
+}
+
+pub fun parse_text_directive(s: string, pos: int) : maybe<(list<string>, int)> {
+  // pos is at '#'. Check for #text: name1, name2
+  if !starts_with_at(s, pos, "#text") { None }
+  else {
+    let p1 = skip_ws(s, pos + 5)
+    if peek(s, p1) == ":" {
+      let (names, p2) = parse_text_names(s, p1 + 1, [])
+      Some((names, p2))
+    }
+    else { None }
+  }
+}
 
 // ============================================================
 // Document parsing
 // ============================================================
 
-pub fun parse_document(s: string, pos: int, nodes: list<HmlNode>) : result<list<HmlNode>, string> {
+pub fun default_text_elems() : list<string> => ["body", "p", "text"]
+
+pub fun parse_document(s: string, pos: int, nodes: list<HmlNode>, text_elems: list<string>) : result<list<HmlNode>, string> {
   let p1 = skip_noise(s, pos)
   if p1 >= str_length(s) { Ok(nodes) }
   else if peek(s, p1) == "@" {
-    match parse_element(s, p1) {
-      Ok((elem, p2)) => parse_document(s, p2, nodes + [NElem(elem)]),
+    match parse_element(s, p1, text_elems) {
+      Ok((elem, p2)) => parse_document(s, p2, nodes + [NElem(elem)], text_elems),
       Err(e) => Err(e)
     }
   }
   else if peek(s, p1) == "#" {
     match parse_namespace_directive(s, p1) {
-      Some((pfx, uri, p2)) => parse_document(s, p2, nodes + [NNamespace(pfx, uri)]),
+      Some((pfx, uri, p2)) => parse_document(s, p2, nodes + [NNamespace(pfx, uri)], text_elems),
       None => {
-        let p2 = skip_to_eol(s, p1)
-        parse_document(s, p2, nodes)
+        match parse_text_directive(s, p1) {
+          Some((names, p2)) => parse_document(s, p2, nodes, text_elems + names),
+          None => {
+            let p2 = skip_to_eol(s, p1)
+            parse_document(s, p2, nodes, text_elems)
+          }
+        }
       }
     }
   }
@@ -731,11 +869,11 @@ pub fun parse_document(s: string, pos: int, nodes: list<HmlNode>) : result<list<
         let p3 = skip_ws(s, p2)
         if peek(s, p3) == ":" {
           let p4 = skip_ws(s, p3 + 1)
-          match parse_value(s, p4) {
+          match parse_value(s, p4, text_elems) {
             Ok((val, p5)) => {
               let new_node = wrap_dotted_value(segments, val)
-              if length(segments) > 1 { parse_document(s, p5, insert_or_merge(nodes, new_node)) }
-              else { parse_document(s, p5, nodes + [new_node]) }
+              if length(segments) > 1 { parse_document(s, p5, insert_or_merge(nodes, new_node), text_elems) }
+              else { parse_document(s, p5, nodes + [new_node], text_elems) }
             },
             Err(e) => Err(e)
           }
@@ -748,7 +886,7 @@ pub fun parse_document(s: string, pos: int, nodes: list<HmlNode>) : result<list<
 }
 
 pub fun hml_parse(input: string) : result<list<HmlNode>, string> =>
-  parse_document(input, 0, [])
+  parse_document(input, 0, [], default_text_elems())
 
 // ============================================================
 // File-based parsing with #include support
@@ -813,20 +951,20 @@ pub fun parse_namespace_directive(s: string, pos: int) : maybe<(string, string, 
   }
 }
 
-pub fun include_file_nodes(s: string, p2: int, content: string, full_path: string, nodes: list<HmlNode>, base_dir: string, seen: list<string>) : result<list<HmlNode>, string> {
+pub fun include_file_nodes(s: string, p2: int, content: string, full_path: string, nodes: list<HmlNode>, base_dir: string, seen: list<string>, text_elems: list<string>) : result<list<HmlNode>, string> {
   let inc_base = dir_of_path(full_path)
-  match parse_file_doc(content, 0, [], inc_base, seen + [full_path]) {
-    Ok(inc_nodes) => parse_file_doc(s, skip_to_eol(s, p2), nodes + inc_nodes, base_dir, seen),
+  match parse_file_doc(content, 0, [], inc_base, seen + [full_path], text_elems) {
+    Ok(inc_nodes) => parse_file_doc(s, skip_to_eol(s, p2), nodes + inc_nodes, base_dir, seen, text_elems),
     Err(e) => Err(e)
   }
 }
 
-pub fun parse_file_doc(s: string, pos: int, nodes: list<HmlNode>, base_dir: string, seen: list<string>) : result<list<HmlNode>, string> {
+pub fun parse_file_doc(s: string, pos: int, nodes: list<HmlNode>, base_dir: string, seen: list<string>, text_elems: list<string>) : result<list<HmlNode>, string> {
   let p1 = skip_noise(s, pos)
   if p1 >= str_length(s) { Ok(nodes) }
   else if peek(s, p1) == "@" {
-    match parse_element(s, p1) {
-      Ok((elem, p2)) => parse_file_doc(s, p2, nodes + [NElem(elem)], base_dir, seen),
+    match parse_element(s, p1, text_elems) {
+      Ok((elem, p2)) => parse_file_doc(s, p2, nodes + [NElem(elem)], base_dir, seen, text_elems),
       Err(e) => Err(e)
     }
   }
@@ -837,15 +975,20 @@ pub fun parse_file_doc(s: string, pos: int, nodes: list<HmlNode>, base_dir: stri
         if list_contains(seen, full_path) { Err("circular include: " + full_path) }
         else {
           match read_file(full_path) {
-            Ok(content) => include_file_nodes(s, p2, content, full_path, nodes, base_dir, seen),
+            Ok(content) => include_file_nodes(s, p2, content, full_path, nodes, base_dir, seen, text_elems),
             Err(_) => Err("cannot read included file: " + full_path)
           }
         }
       },
       None => {
         match parse_namespace_directive(s, p1) {
-          Some((pfx, uri, p2)) => parse_file_doc(s, p2, nodes + [NNamespace(pfx, uri)], base_dir, seen),
-          None => parse_file_doc(s, skip_to_eol(s, p1), nodes, base_dir, seen)
+          Some((pfx, uri, p2)) => parse_file_doc(s, p2, nodes + [NNamespace(pfx, uri)], base_dir, seen, text_elems),
+          None => {
+            match parse_text_directive(s, p1) {
+              Some((names, p2)) => parse_file_doc(s, p2, nodes, base_dir, seen, text_elems + names),
+              None => parse_file_doc(s, skip_to_eol(s, p1), nodes, base_dir, seen, text_elems)
+            }
+          }
         }
       }
     }
@@ -856,11 +999,11 @@ pub fun parse_file_doc(s: string, pos: int, nodes: list<HmlNode>, base_dir: stri
         let p3 = skip_ws(s, p2)
         if peek(s, p3) == ":" {
           let p4 = skip_ws(s, p3 + 1)
-          match parse_value(s, p4) {
+          match parse_value(s, p4, text_elems) {
             Ok((val, p5)) => {
               let new_node = wrap_dotted_value(segments, val)
-              if length(segments) > 1 { parse_file_doc(s, p5, insert_or_merge(nodes, new_node), base_dir, seen) }
-              else { parse_file_doc(s, p5, nodes + [new_node], base_dir, seen) }
+              if length(segments) > 1 { parse_file_doc(s, p5, insert_or_merge(nodes, new_node), base_dir, seen, text_elems) }
+              else { parse_file_doc(s, p5, nodes + [new_node], base_dir, seen, text_elems) }
             },
             Err(e) => Err(e)
           }
@@ -874,7 +1017,7 @@ pub fun parse_file_doc(s: string, pos: int, nodes: list<HmlNode>, base_dir: stri
 
 pub fun hml_parse_file_content(content: string, path: string) : result<list<HmlNode>, string> {
   let base = dir_of_path(path)
-  parse_file_doc(content, 0, [], base, [path])
+  parse_file_doc(content, 0, [], base, [path], default_text_elems())
 }
 
 pub fun hml_parse_file(path: string) : result<list<HmlNode>, string> {

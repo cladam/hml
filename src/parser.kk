@@ -1235,16 +1235,16 @@ pub fun hc_parse_exponent(s : string, pos : int)
   ((hc_sign ++ digits_str), p2)
 
 // .hc:425
-pub fun hc_parse_array(s : string, pos : int, items : list<hml>)
+pub fun hc_parse_array(s : string, pos : int, items : list<hml>, text_elems : list<string>)
   val p1 : int = hc_skip_noise(s, pos)
   if (hc_peek(s, p1) == "]") then
     Right((HArray(items), (p1 + 1)))
   else
-    match hc_parse_value(s, p1)
+    match hc_parse_value(s, p1, text_elems)
       Right((v, p2)) ->
         val p3 = hc_skip_noise(s, p2)
         if (hc_peek(s, p3) == ",") then
-          hc_parse_array(s, (p3 + 1), (items ++ [v]))
+          hc_parse_array(s, (p3 + 1), (items ++ [v]), text_elems)
         else if (hc_peek(s, p3) == "]") then Right((HArray((items ++ [v])), (p3 + 1))) else Left(("expected ',' or ']' in array at position " ++ show(p3)))
       Left(e) ->
         Left(e)
@@ -1276,7 +1276,7 @@ pub fun hc_parse_literal_value(s : string, p : int)
         Left(e)
 
 // .hc:468
-pub fun hc_parse_value(s : string, pos : int)
+pub fun hc_parse_value(s : string, pos : int, text_elems : list<string>)
   val p : int = hc_skip_ws(s, pos)
   if (hc_peek(s, p) == "\"") then
     hc_parse_string_value(s, p)
@@ -1295,9 +1295,9 @@ pub fun hc_parse_value(s : string, pos : int)
   else if (hc_starts_with_at(s, p, "nan") && !(hc_is_bare_key_char(hc_peek(s, (p + 3))))) then
     Right((HFloat((0.0 / 0.0)), (p + 3)))
   else if (hc_peek(s, p) == "[") then
-    hc_parse_array(s, (p + 1), [])
+    hc_parse_array(s, (p + 1), [], text_elems)
   else if (hc_peek(s, p) == "@") then
-    hc_parse_inline_element(s, p)
+    hc_parse_inline_element(s, p, text_elems)
   else if ((hc_is_digit(hc_peek(s, p)) || (hc_peek(s, p) == "+")) || (hc_peek(s, p) == "-")) then
     hc_parse_number_or_duration(s, p)
   else
@@ -1359,7 +1359,7 @@ pub fun hc_parse_element_name(s : string, pos : int, acc : string)
       Left(e)
 
 // .hc:557
-pub fun hc_parse_attributes(s : string, pos : int, attrs : list<(string, hml)>)
+pub fun hc_parse_attributes(s : string, pos : int, attrs : list<(string, hml)>, text_elems : list<string>)
   val p1 : int = hc_skip_noise(s, pos)
   if (hc_peek(s, p1) == ")") then
     Right((attrs, (p1 + 1)))
@@ -1369,15 +1369,15 @@ pub fun hc_parse_attributes(s : string, pos : int, attrs : list<(string, hml)>)
         val p3 = hc_skip_ws(s, p2)
         if (hc_peek(s, p3) == ":") then
           val p4 : int = hc_skip_ws(s, (p3 + 1))
-          match hc_parse_value(s, p4)
+          match hc_parse_value(s, p4, text_elems)
             Right((hc_val, p5)) ->
               val p6 = hc_skip_noise(s, p5)
-              if (hc_peek(s, p6) == ",") then hc_parse_attributes(s, (p6 + 1), (attrs ++ [(key, hc_val)])) else hc_parse_attributes(s, p6, (attrs ++ [(key, hc_val)]))
+              if (hc_peek(s, p6) == ",") then hc_parse_attributes(s, (p6 + 1), (attrs ++ [(key, hc_val)]), text_elems) else hc_parse_attributes(s, p6, (attrs ++ [(key, hc_val)]), text_elems)
             Left(e) ->
               Left(e)
         else
           val p4 : int = hc_skip_noise(s, p3)
-          if (hc_peek(s, p4) == ",") then hc_parse_attributes(s, (p4 + 1), (attrs ++ [(key, HBool(True))])) else hc_parse_attributes(s, p4, (attrs ++ [(key, HBool(True))]))
+          if (hc_peek(s, p4) == ",") then hc_parse_attributes(s, (p4 + 1), (attrs ++ [(key, HBool(True))]), text_elems) else hc_parse_attributes(s, p4, (attrs ++ [(key, HBool(True))]), text_elems)
       Left(e) ->
         Left(e)
 
@@ -1426,14 +1426,14 @@ pub fun hc_merge_body(nodes : list<hmlnode>)
   hc_merge_body_acc(nodes, [])
 
 // .hc:637
-pub fun hc_parse_body(s : string, pos : int, nodes : list<hmlnode>)
+pub fun hc_parse_body(s : string, pos : int, nodes : list<hmlnode>, text_elems : list<string>)
   val p1 : int = hc_skip_noise(s, pos)
   if (hc_peek(s, p1) == "}") then
     Right((nodes, (p1 + 1)))
   else if (hc_peek(s, p1) == "@") then
-    match hc_parse_element(s, p1)
+    match hc_parse_element(s, p1, text_elems)
       Right((elem, p2)) ->
-        hc_parse_body(s, p2, (nodes ++ [NElem(elem)]))
+        hc_parse_body(s, p2, (nodes ++ [NElem(elem)]), text_elems)
       Left(e) ->
         Left(e)
   else if (hc_peek(s, p1) == "") then
@@ -1444,10 +1444,10 @@ pub fun hc_parse_body(s : string, pos : int, nodes : list<hmlnode>)
         val p3 = hc_skip_ws(s, p2)
         if (hc_peek(s, p3) == ":") then
           val p4 : int = hc_skip_ws(s, (p3 + 1))
-          match hc_parse_value(s, p4)
+          match hc_parse_value(s, p4, text_elems)
             Right((hc_val, p5)) ->
               val new_node = hc_wrap_dotted_value(segments, hc_val)
-              if (list/length(segments) > 1) then hc_parse_body(s, p5, hc_insert_or_merge(nodes, new_node)) else hc_parse_body(s, p5, (nodes ++ [new_node]))
+              if (list/length(segments) > 1) then hc_parse_body(s, p5, hc_insert_or_merge(nodes, new_node), text_elems) else hc_parse_body(s, p5, (nodes ++ [new_node]), text_elems)
             Left(e) ->
               Left(e)
         else
@@ -1456,13 +1456,112 @@ pub fun hc_parse_body(s : string, pos : int, nodes : list<hmlnode>)
         Left(("unexpected content in body at position " ++ show(p1)))
 
 // .hc:667
-pub fun hc_parse_element(s : string, pos : int)
+pub fun hc_is_text_elem(name : string, text_elems : list<string>)
+  match text_elems
+    Nil ->
+      False
+    Cons(x, rest) ->
+      if (x == name) then True else hc_is_text_elem(name, rest)
+
+// .hc:675
+pub fun hc_collect_text_run(s : string, pos : int, acc : string, text_elems : list<string>)
+  if (pos >= s.count) then
+    (if (acc == "") then [] else [NText(acc)], pos)
+  else if (hc_peek(s, pos) == "}") then
+    (if (acc == "") then [] else [NText(acc)], pos)
+  else if (hc_peek(s, pos) == "\n") then
+    (if (acc == "") then [] else [NText(acc)], (pos + 1))
+  else if (hc_peek(s, pos) == "@") then
+    match hc_try_inline_element(s, pos, text_elems)
+      Just((elem, p2)) ->
+        val text_nodes = if (acc == "") then [] else [NText(acc)]
+        val (rest_nodes, p3) = hc_collect_text_run(s, p2, "", text_elems)
+        (((text_nodes ++ [NElem(elem)]) ++ rest_nodes), p3)
+      Nothing ->
+        hc_collect_text_run(s, (pos + 1), (acc ++ "@"), text_elems)
+  else
+    hc_collect_text_run(s, (pos + 1), (acc ++ hc_peek(s, pos)), text_elems)
+
+// .hc:693
+pub fun hc_try_inline_element(s : string, pos : int, text_elems : list<string>)
+  val p1 : int = (pos + 1)
+  match hc_parse_element_name(s, p1, "")
+    Right((name, p2)) ->
+      if (hc_peek(s, p2) == "(") then
+        match hc_parse_attributes(s, (p2 + 1), [], text_elems)
+          Right((attrs, p3)) ->
+            if (hc_peek(s, p3) == "{") then
+              match hc_parse_text_body(s, (p3 + 1), [], text_elems)
+                Right((body, p4)) ->
+                  Just((HElement(name, attrs, body), p4))
+                Left(_) ->
+                  Nothing
+            else
+              Just((HElement(name, attrs, []), p3))
+          Left(_) ->
+            Nothing
+      else if (hc_peek(s, p2) == "{") then
+        match hc_parse_text_body(s, (p2 + 1), [], text_elems)
+          Right((body, p3)) ->
+            Just((HElement(name, [], body), p3))
+          Left(_) ->
+            Nothing
+      else
+        Just((HElement(name, [], []), p2))
+    Left(_) ->
+      Nothing
+
+// .hc:721
+pub fun hc_try_text_property(s : string, pos : int, text_elems : list<string>)
+  match hc_parse_bare_key(s, pos, "")
+    Right((key, p2)) ->
+      val p3 = hc_skip_ws(s, p2)
+      if (hc_peek(s, p3) == ":") then
+        val p4 : int = hc_skip_ws(s, (p3 + 1))
+        match hc_parse_value(s, p4, text_elems)
+          Right((hc_val, p5)) ->
+            Just((NProp(key, hc_val), p5))
+          Left(_) ->
+            Nothing
+      else
+        Nothing
+    Left(_) ->
+      Nothing
+
+// .hc:735
+pub fun hc_parse_text_body(s : string, pos : int, nodes : list<hmlnode>, text_elems : list<string>)
+  val p1 : int = hc_skip_ws(s, pos)
+  if (p1 >= s.count) then
+    Left("unterminated text body (missing '}')")
+  else if (hc_peek(s, p1) == "}") then
+    Right((nodes, (p1 + 1)))
+  else if hc_is_newline(hc_peek(s, p1)) then
+    hc_parse_text_body(s, (p1 + 1), nodes, text_elems)
+  else if ((((p1 + 1) < s.count) && (hc_peek(s, p1) == "/")) && (hc_peek(s, (p1 + 1)) == "/")) then
+    val p2 : int = hc_skip_to_eol(s, (p1 + 2))
+    hc_parse_text_body(s, p2, nodes, text_elems)
+  else if (hc_peek(s, p1) == "@") then
+    match hc_parse_element(s, p1, text_elems)
+      Right((elem, p2)) ->
+        hc_parse_text_body(s, p2, (nodes ++ [NElem(elem)]), text_elems)
+      Left(e) ->
+        Left(e)
+  else
+    match hc_try_text_property(s, p1, text_elems)
+      Just((prop, p2)) ->
+        hc_parse_text_body(s, p2, (nodes ++ [prop]), text_elems)
+      Nothing ->
+        val (text_nodes, p2) = hc_collect_text_run(s, p1, "", text_elems)
+        hc_parse_text_body(s, p2, (nodes ++ text_nodes), text_elems)
+
+// .hc:764
+pub fun hc_parse_element(s : string, pos : int, text_elems : list<string>)
   val p1 : int = (pos + 1)
   match hc_parse_element_name(s, p1, "")
     Right((name, p2)) ->
       val p3 = hc_skip_ws(s, p2)
       val hc__scrut = if (hc_peek(s, p3) == "(") then
-        match hc_parse_attributes(s, (p3 + 1), [])
+        match hc_parse_attributes(s, (p3 + 1), [], text_elems)
           Right((attrs, p4)) ->
             Right((attrs, p4))
           Left(e) ->
@@ -1473,11 +1572,18 @@ pub fun hc_parse_element(s : string, pos : int)
         Right((attrs, p4)) ->
           val p5 = hc_skip_ws(s, p4)
           if (hc_peek(s, p5) == "{") then
-            match hc_parse_body(s, (p5 + 1), [])
-              Right((body, p6)) ->
-                Right((HElement(name, attrs, body), p6))
-              Left(e) ->
-                Left(e)
+            if hc_is_text_elem(name, text_elems) then
+              match hc_parse_text_body(s, (p5 + 1), [], text_elems)
+                Right((body, p6)) ->
+                  Right((HElement(name, attrs, body), p6))
+                Left(e) ->
+                  Left(e)
+            else
+              match hc_parse_body(s, (p5 + 1), [], text_elems)
+                Right((body, p6)) ->
+                  Right((HElement(name, attrs, body), p6))
+                Left(e) ->
+                  Left(e)
           else
             Right((HElement(name, attrs, []), p5))
         Left(e) ->
@@ -1485,38 +1591,72 @@ pub fun hc_parse_element(s : string, pos : int)
     Left(e) ->
       Left(e)
 
-// .hc:695
-pub fun hc_parse_inline_element(s : string, pos : int)
-  hc_parse_element(s, pos)
+// .hc:800
+pub fun hc_parse_inline_element(s : string, pos : int, text_elems : list<string>)
+  hc_parse_element(s, pos, text_elems)
 
-// .hc:707
-pub fun hc_parse_document(s : string, pos : int, nodes : list<hmlnode>)
+// .hc:809
+pub fun hc_parse_text_names(s : string, pos : int, names : list<string>)
+  val p1 : int = hc_skip_ws(s, pos)
+  if ((p1 >= s.count) || hc_is_newline(hc_peek(s, p1))) then
+    (names, p1)
+  else if (hc_peek(s, p1) == ",") then
+    hc_parse_text_names(s, (p1 + 1), names)
+  else
+    match hc_parse_bare_key(s, p1, "")
+      Right((name, p2)) ->
+        hc_parse_text_names(s, p2, (names ++ [name]))
+      Left(_) ->
+        (names, p1)
+
+// .hc:818
+pub fun hc_parse_text_directive(s : string, pos : int)
+  if !(hc_starts_with_at(s, pos, "#text")) then
+    Nothing
+  else
+    val p1 : int = hc_skip_ws(s, (pos + 5))
+    if (hc_peek(s, p1) == ":") then
+      val (names, p2) = hc_parse_text_names(s, (p1 + 1), [])
+      Just((names, p2))
+    else
+      Nothing
+
+// .hc:837
+pub fun hc_default_text_elems() : list<string>
+  ["body", "p", "text"]
+
+// .hc:839
+pub fun hc_parse_document(s : string, pos : int, nodes : list<hmlnode>, text_elems : list<string>)
   val p1 : int = hc_skip_noise(s, pos)
   if (p1 >= s.count) then
     Right(nodes)
   else if (hc_peek(s, p1) == "@") then
-    match hc_parse_element(s, p1)
+    match hc_parse_element(s, p1, text_elems)
       Right((elem, p2)) ->
-        hc_parse_document(s, p2, (nodes ++ [NElem(elem)]))
+        hc_parse_document(s, p2, (nodes ++ [NElem(elem)]), text_elems)
       Left(e) ->
         Left(e)
   else if (hc_peek(s, p1) == "#") then
     match hc_parse_namespace_directive(s, p1)
       Just((pfx, uri, p2)) ->
-        hc_parse_document(s, p2, (nodes ++ [NNamespace(pfx, uri)]))
+        hc_parse_document(s, p2, (nodes ++ [NNamespace(pfx, uri)]), text_elems)
       Nothing ->
-        val p2 = hc_skip_to_eol(s, p1)
-        hc_parse_document(s, p2, nodes)
+        match hc_parse_text_directive(s, p1)
+          Just((names, p2)) ->
+            hc_parse_document(s, p2, nodes, (text_elems ++ names))
+          Nothing ->
+            val p2 = hc_skip_to_eol(s, p1)
+            hc_parse_document(s, p2, nodes, text_elems)
   else
     match hc_parse_key_path(s, p1)
       Right((segments, p2)) ->
         val p3 = hc_skip_ws(s, p2)
         if (hc_peek(s, p3) == ":") then
           val p4 : int = hc_skip_ws(s, (p3 + 1))
-          match hc_parse_value(s, p4)
+          match hc_parse_value(s, p4, text_elems)
             Right((hc_val, p5)) ->
               val new_node = hc_wrap_dotted_value(segments, hc_val)
-              if (list/length(segments) > 1) then hc_parse_document(s, p5, hc_insert_or_merge(nodes, new_node)) else hc_parse_document(s, p5, (nodes ++ [new_node]))
+              if (list/length(segments) > 1) then hc_parse_document(s, p5, hc_insert_or_merge(nodes, new_node), text_elems) else hc_parse_document(s, p5, (nodes ++ [new_node]), text_elems)
             Left(e) ->
               Left(e)
         else
@@ -1524,23 +1664,23 @@ pub fun hc_parse_document(s : string, pos : int, nodes : list<hmlnode>)
       Left(_) ->
         Left(("unexpected content at position " ++ show(p1)))
 
-// .hc:744
+// .hc:882
 pub fun hc_hml_parse(input : string)
-  hc_parse_document(input, 0, [])
+  hc_parse_document(input, 0, [], hc_default_text_elems())
 
-// .hc:754
+// .hc:892
 pub fun hc_find_last_slash(s : string, pos : int, last_end : int)
   if (pos >= s.count) then last_end else if (hc_peek(s, pos) == "/") then hc_find_last_slash(s, (pos + 1), (pos + 1)) else hc_find_last_slash(s, (pos + 1), last_end)
 
-// .hc:759
+// .hc:897
 pub fun hc_dir_of_path(hc_path : string)
   hc_path.list.drop(0).take((hc_find_last_slash(hc_path, 0, 0)) - (0)).string
 
-// .hc:760
+// .hc:898
 pub fun hc_resolve_include_path(base_dir : string, rel : string) : string
   (base_dir ++ rel)
 
-// .hc:766
+// .hc:902
 pub fun hc_list_contains(items : list<string>, target : string)
   match items
     Nil ->
@@ -1548,7 +1688,7 @@ pub fun hc_list_contains(items : list<string>, target : string)
     Cons(x, rest) ->
       if (x == target) then True else hc_list_contains(rest, target)
 
-// .hc:771
+// .hc:909
 pub fun hc_parse_include_path(s : string, pos : int)
   if !(hc_starts_with_at(s, pos, "#include")) then
     Nothing
@@ -1563,7 +1703,7 @@ pub fun hc_parse_include_path(s : string, pos : int)
     else
       Nothing
 
-// .hc:783
+// .hc:921
 pub fun hc_parse_namespace_directive(s : string, pos : int)
   if !(hc_starts_with_at(s, pos, "#namespace")) then
     Nothing
@@ -1587,24 +1727,24 @@ pub fun hc_parse_namespace_directive(s : string, pos : int)
       Left(_) ->
         Nothing
 
-// .hc:807
-pub fun hc_include_file_nodes(s : string, p2 : int, content : string, full_path : string, nodes : list<hmlnode>, base_dir : string, seen : list<string>)
+// .hc:945
+pub fun hc_include_file_nodes(s : string, p2 : int, content : string, full_path : string, nodes : list<hmlnode>, base_dir : string, seen : list<string>, text_elems : list<string>)
   val inc_base : string = hc_dir_of_path(full_path)
-  match hc_parse_file_doc(content, 0, [], inc_base, (seen ++ [full_path]))
+  match hc_parse_file_doc(content, 0, [], inc_base, (seen ++ [full_path]), text_elems)
     Right(inc_nodes) ->
-      hc_parse_file_doc(s, hc_skip_to_eol(s, p2), (nodes ++ inc_nodes), base_dir, seen)
+      hc_parse_file_doc(s, hc_skip_to_eol(s, p2), (nodes ++ inc_nodes), base_dir, seen, text_elems)
     Left(e) ->
       Left(e)
 
-// .hc:819
-pub fun hc_parse_file_doc(s : string, pos : int, nodes : list<hmlnode>, base_dir : string, seen : list<string>)
+// .hc:957
+pub fun hc_parse_file_doc(s : string, pos : int, nodes : list<hmlnode>, base_dir : string, seen : list<string>, text_elems : list<string>)
   val p1 : int = hc_skip_noise(s, pos)
   if (p1 >= s.count) then
     Right(nodes)
   else if (hc_peek(s, p1) == "@") then
-    match hc_parse_element(s, p1)
+    match hc_parse_element(s, p1, text_elems)
       Right((elem, p2)) ->
-        hc_parse_file_doc(s, p2, (nodes ++ [NElem(elem)]), base_dir, seen)
+        hc_parse_file_doc(s, p2, (nodes ++ [NElem(elem)]), base_dir, seen, text_elems)
       Left(e) ->
         Left(e)
   else if (hc_peek(s, p1) == "#") then
@@ -1616,25 +1756,32 @@ pub fun hc_parse_file_doc(s : string, pos : int, nodes : list<hmlnode>, base_dir
         else
           match (match try({ read-text-file(full_path.path) }) { Ok(hc__c) -> Right(hc__c); Error(hc__e) -> Left(hc__e.message) })
             Right(content) ->
-              hc_include_file_nodes(s, p2, content, full_path, nodes, base_dir, seen)
+              hc_include_file_nodes(s, p2, content, full_path, nodes, base_dir, seen, text_elems)
             Left(_) ->
               Left(("cannot read included file: " ++ full_path))
       Nothing ->
         match hc_parse_namespace_directive(s, p1)
           Just((pfx, uri, p2)) ->
-            hc_parse_file_doc(s, p2, (nodes ++ [NNamespace(pfx, uri)]), base_dir, seen)
+            hc_parse_file_doc(s, p2, (nodes ++ [NNamespace(pfx, uri)]), base_dir, seen, text_elems)
           Nothing ->
-            hc_parse_file_doc(s, hc_skip_to_eol(s, p1), nodes, base_dir, seen)
+            match hc_parse_text_directive(s, p1)
+              Just((names, p2)) ->
+                hc_parse_file_doc(s, p2, nodes, base_dir, seen, (text_elems ++ names))
+              Nothing ->
+                hc_parse_file_doc(s, hc_skip_to_eol(s, p1), nodes, base_dir, seen, text_elems)
   else
     match hc_parse_key_path(s, p1)
       Right((segments, p2)) ->
         val p3 = hc_skip_ws(s, p2)
         if (hc_peek(s, p3) == ":") then
           val p4 : int = hc_skip_ws(s, (p3 + 1))
-          match hc_parse_value(s, p4)
+          match hc_parse_value(s, p4, text_elems)
             Right((hc_val, p5)) ->
               val new_node = hc_wrap_dotted_value(segments, hc_val)
-              if (list/length(segments) > 1) then hc_parse_file_doc(s, p5, hc_insert_or_merge(nodes, new_node), base_dir, seen) else hc_parse_file_doc(s, p5, (nodes ++ [new_node]), base_dir, seen)
+              if (list/length(segments) > 1) then
+                hc_parse_file_doc(s, p5, hc_insert_or_merge(nodes, new_node), base_dir, seen, text_elems)
+              else
+                hc_parse_file_doc(s, p5, (nodes ++ [new_node]), base_dir, seen, text_elems)
             Left(e) ->
               Left(e)
         else
@@ -1642,12 +1789,12 @@ pub fun hc_parse_file_doc(s : string, pos : int, nodes : list<hmlnode>, base_dir
       Left(_) ->
         Left(("unexpected content at position " ++ show(p1)))
 
-// .hc:868
+// .hc:1011
 pub fun hc_hml_parse_file_content(content : string, hc_path : string)
   val base : string = hc_dir_of_path(hc_path)
-  hc_parse_file_doc(content, 0, [], base, [hc_path])
+  hc_parse_file_doc(content, 0, [], base, [hc_path], hc_default_text_elems())
 
-// .hc:875
+// .hc:1019
 pub fun hc_hml_parse_file(hc_path : string)
   match (match try({ read-text-file(hc_path.path) }) { Ok(hc__c) -> Right(hc__c); Error(hc__e) -> Left(hc__e.message) })
     Right(content) ->

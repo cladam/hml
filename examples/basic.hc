@@ -2,7 +2,7 @@
 import "../src/hml"
 
 fun main() {
-  let input = "@server(port: 8080, public) {\n    host: \"localhost\"\n    name: \"api\"\n    timeout: 30s\n}"
+  let input = "@server(port: 8080, public) \{\n    host: \"localhost\"\n    name: \"api\"\n    timeout: 30s\n\}"
   match hml_parse(input) {
     Ok(nodes) => {
       println("Parsed OK:")

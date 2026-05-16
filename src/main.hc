@@ -1,3 +1,5 @@
+import "./hml"
+
 fun main() {
-  println("hello from hml")
+  println("hml v0.1.0")
 }

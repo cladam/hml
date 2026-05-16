@@ -933,6 +933,14 @@ pub fun hc_hml_duration(v : hml) : maybe<(int, string)>
       Nothing
 
 // .hc:61
+pub fun hc_hml_datetime(v : hml) : maybe<string>
+  match v
+    HDatetime(s) ->
+      Just(s)
+    _ ->
+      Nothing
+
+// .hc:66
 pub fun hc_hml_list(v : hml) : maybe<list<hml>>
   match v
     HArray(items) ->
@@ -940,7 +948,7 @@ pub fun hc_hml_list(v : hml) : maybe<list<hml>>
     _ ->
       Nothing
 
-// .hc:66
+// .hc:71
 pub fun hc_hml_body(v : hml) : maybe<list<hmlnode>>
   match v
     HElement(_, _, body) ->
@@ -948,7 +956,7 @@ pub fun hc_hml_body(v : hml) : maybe<list<hmlnode>>
     _ ->
       Nothing
 
-// .hc:71
+// .hc:76
 pub fun hc_hml_attrs(v : hml) : maybe<list<(string, hml)>>
   match v
     HElement(_, attrs, _) ->
@@ -956,7 +964,7 @@ pub fun hc_hml_attrs(v : hml) : maybe<list<(string, hml)>>
     _ ->
       Nothing
 
-// .hc:76
+// .hc:81
 pub fun hc_hml_attr(v : hml, key : string) : div maybe<hml>
   match v
     HElement(_, attrs, _) ->
@@ -964,7 +972,7 @@ pub fun hc_hml_attr(v : hml, key : string) : div maybe<hml>
     _ ->
       Nothing
 
-// .hc:81
+// .hc:86
 pub fun hc_find_attr(attrs : list<(string, hml)>, key : string) : div maybe<hml>
   match attrs
     Nil ->
@@ -972,7 +980,7 @@ pub fun hc_find_attr(attrs : list<(string, hml)>, key : string) : div maybe<hml>
     Cons((k, v), rest) ->
       if (k == key) then Just(v) else hc_find_attr(rest, key)
 
-// .hc:93
+// .hc:98
 pub fun hc_hml_ok(r : either<string, list<hmlnode>>) : maybe<list<hmlnode>>
   match r
     Right(nodes) ->
@@ -980,15 +988,15 @@ pub fun hc_hml_ok(r : either<string, list<hmlnode>>) : maybe<list<hmlnode>>
     Left(_) ->
       Nothing
 
-// .hc:97
+// .hc:102
 pub fun hc_at(nodes : list<hmlnode>, key : string) : div maybe<hml>
   hc_hml_get(nodes, key)
 
-// .hc:101
+// .hc:106
 pub fun hc_elem_at(nodes : list<hmlnode>, name : string) : div maybe<hml>
   hc_hml_elem(nodes, name)
 
-// .hc:104
+// .hc:109
 pub fun hc_as_str(v : maybe<hml>) : maybe<string>
   match v
     Just(h) ->
@@ -996,7 +1004,7 @@ pub fun hc_as_str(v : maybe<hml>) : maybe<string>
     Nothing ->
       Nothing
 
-// .hc:108
+// .hc:113
 pub fun hc_as_int(v : maybe<hml>) : maybe<int>
   match v
     Just(h) ->
@@ -1004,10 +1012,18 @@ pub fun hc_as_int(v : maybe<hml>) : maybe<int>
     Nothing ->
       Nothing
 
-// .hc:113
+// .hc:118
 pub fun hc_as_bool(v : maybe<hml>) : maybe<bool>
   match v
     Just(h) ->
       hc_hml_bool(h)
+    Nothing ->
+      Nothing
+
+// .hc:123
+pub fun hc_as_datetime(v : maybe<hml>) : maybe<string>
+  match v
+    Just(h) ->
+      hc_hml_datetime(h)
     Nothing ->
       Nothing

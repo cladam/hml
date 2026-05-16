@@ -61,6 +61,11 @@ pub fun hml_duration(v: Hml) : maybe<(int, string)> => match v {
   _ => None
 }
 
+pub fun hml_datetime(v: Hml) : maybe<string> => match v {
+  HDatetime(s) => Some(s),
+  _ => None
+}
+
 pub fun hml_list(v: Hml) : maybe<list<Hml>> => match v {
   HArray(items) => Some(items),
   _ => None
@@ -115,5 +120,10 @@ pub fun as_int(v: maybe<Hml>) : maybe<int> => match v {
 
 pub fun as_bool(v: maybe<Hml>) : maybe<bool> => match v {
   Some(h) => hml_bool(h),
+  None => None
+}
+
+pub fun as_datetime(v: maybe<Hml>) : maybe<string> => match v {
+  Some(h) => hml_datetime(h),
   None => None
 }

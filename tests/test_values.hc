@@ -331,3 +331,237 @@ test "comment-only input" {
     Err(_) => assert(false)
   }
 }
+
+// ============================================================
+// Escape sequences: \b and \f
+// ============================================================
+
+test "backspace escape" {
+  match hml_parse("x: \"a\\bb\"") {
+    Ok(nodes) => {
+      match at(nodes, "x") |> as_str {
+        Some(v) => {
+          let expected = join(["a", char_to_string(chr(8)), "b"], "")
+          assert(v == expected)
+        },
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "formfeed escape" {
+  match hml_parse("x: \"a\\fb\"") {
+    Ok(nodes) => {
+      match at(nodes, "x") |> as_str {
+        Some(v) => {
+          let expected = join(["a", char_to_string(chr(12)), "b"], "")
+          assert(v == expected)
+        },
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+// ============================================================
+// Hex, octal, binary integers
+// ============================================================
+
+test "hex integer" {
+  match hml_parse("x: 0xFF") {
+    Ok(nodes) => {
+      match at(nodes, "x") |> as_int {
+        Some(v) => assert(v == 255),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "hex integer lowercase" {
+  match hml_parse("x: 0x1a") {
+    Ok(nodes) => {
+      match at(nodes, "x") |> as_int {
+        Some(v) => assert(v == 26),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "hex integer with underscores" {
+  match hml_parse("x: 0xFF_FF") {
+    Ok(nodes) => {
+      match at(nodes, "x") |> as_int {
+        Some(v) => assert(v == 65535),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "negative hex integer" {
+  match hml_parse("x: -0xFF") {
+    Ok(nodes) => {
+      match at(nodes, "x") |> as_int {
+        Some(v) => assert(v == -255),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "octal integer" {
+  match hml_parse("x: 0o77") {
+    Ok(nodes) => {
+      match at(nodes, "x") |> as_int {
+        Some(v) => assert(v == 63),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "binary integer" {
+  match hml_parse("x: 0b1010") {
+    Ok(nodes) => {
+      match at(nodes, "x") |> as_int {
+        Some(v) => assert(v == 10),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "binary integer with underscores" {
+  match hml_parse("x: 0b1111_0000") {
+    Ok(nodes) => {
+      match at(nodes, "x") |> as_int {
+        Some(v) => assert(v == 240),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+// ============================================================
+// Date-time parsing
+// ============================================================
+
+test "date only" {
+  match hml_parse("d: 2024-05-27") {
+    Ok(nodes) => {
+      match at(nodes, "d") |> as_datetime {
+        Some(v) => assert(v == "2024-05-27"),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "datetime with Z offset" {
+  match hml_parse("d: 2024-05-27T07:32:00Z") {
+    Ok(nodes) => {
+      match at(nodes, "d") |> as_datetime {
+        Some(v) => assert(v == "2024-05-27T07:32:00Z"),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "datetime with numeric offset" {
+  match hml_parse("d: 2024-05-27T00:32:00-07:00") {
+    Ok(nodes) => {
+      match at(nodes, "d") |> as_datetime {
+        Some(v) => assert(v == "2024-05-27T00:32:00-07:00"),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "datetime with positive offset" {
+  match hml_parse("d: 2024-05-27T10:00:00+05:30") {
+    Ok(nodes) => {
+      match at(nodes, "d") |> as_datetime {
+        Some(v) => assert(v == "2024-05-27T10:00:00+05:30"),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "local datetime no offset" {
+  match hml_parse("d: 2024-05-27T07:32:00") {
+    Ok(nodes) => {
+      match at(nodes, "d") |> as_datetime {
+        Some(v) => assert(v == "2024-05-27T07:32:00"),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "datetime with fractional seconds" {
+  match hml_parse("d: 2024-05-27T07:32:00.123Z") {
+    Ok(nodes) => {
+      match at(nodes, "d") |> as_datetime {
+        Some(v) => assert(v == "2024-05-27T07:32:00.123Z"),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "time only" {
+  match hml_parse("t: 07:32:00") {
+    Ok(nodes) => {
+      match at(nodes, "t") |> as_datetime {
+        Some(v) => assert(v == "07:32:00"),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "time with fractional seconds" {
+  match hml_parse("t: 14:30:00.999") {
+    Ok(nodes) => {
+      match at(nodes, "t") |> as_datetime {
+        Some(v) => assert(v == "14:30:00.999"),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "four digit integer not confused with date" {
+  match hml_parse("port: 8080") {
+    Ok(nodes) => {
+      match at(nodes, "port") |> as_int {
+        Some(v) => assert(v == 8080),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}

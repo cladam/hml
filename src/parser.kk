@@ -928,22 +928,83 @@ pub fun hc_parse_hex_digits(s : string, pos : int, n : int, acc : int) : div eit
     Left(("invalid hex digit in unicode escape: " ++ hc_peek(s, pos)))
 
 // .hc:51
+pub fun hc_is_octal_char(c : string) : bool
+  ((c != "") && "01234567".contains(c))
+
+// .hc:54
+pub fun hc_is_binary_char(c : string) : bool
+  ((c == "0") || (c == "1"))
+
+// .hc:57
+pub fun hc_parse_hex_int_digits(s : string, pos : int, acc : int) : div (int, int, int)
+  if ((pos >= s.count) || !(hc_is_hex_char(hc_peek(s, pos)))) then
+    if (((hc_peek(s, pos) == "_") && ((pos + 1) < s.count)) && hc_is_hex_char(hc_peek(s, (pos + 1)))) then hc_parse_hex_int_digits(s, (pos + 1), acc) else (acc, pos, 0)
+  else
+    val (hc_val, p2, cnt) = hc_parse_hex_int_digits(s, (pos + 1), ((acc * 16) + hc_hex_digit_val(hc_peek(s, pos))))
+    (hc_val, p2, (cnt + 1))
+
+// .hc:69
+pub fun hc_parse_hex_int(s : string, pos : int, hc_sign : string) : div either<string, (hml, int)>
+  val (hc_val, p2, cnt) = hc_parse_hex_int_digits(s, pos, 0)
+  if (cnt == 0) then
+    Left(("expected hex digits after 0x at position " ++ show(pos)))
+  else
+    val result : int = if (hc_sign == "-") then (0 - hc_val) else hc_val
+    Right((HInt(result), p2))
+
+// .hc:78
+pub fun hc_parse_octal_int_digits(s : string, pos : int, acc : int) : div (int, int, int)
+  if ((pos >= s.count) || !(hc_is_octal_char(hc_peek(s, pos)))) then
+    if (((hc_peek(s, pos) == "_") && ((pos + 1) < s.count)) && hc_is_octal_char(hc_peek(s, (pos + 1)))) then hc_parse_octal_int_digits(s, (pos + 1), acc) else (acc, pos, 0)
+  else
+    val digit : int = hc_hex_digit_val(hc_peek(s, pos))
+    val (hc_val, p2, cnt) = hc_parse_octal_int_digits(s, (pos + 1), ((acc * 8) + digit))
+    (hc_val, p2, (cnt + 1))
+
+// .hc:92
+pub fun hc_parse_octal_int(s : string, pos : int, hc_sign : string) : div either<string, (hml, int)>
+  val (hc_val, p2, cnt) = hc_parse_octal_int_digits(s, pos, 0)
+  if (cnt == 0) then
+    Left(("expected octal digits after 0o at position " ++ show(pos)))
+  else
+    val result : int = if (hc_sign == "-") then (0 - hc_val) else hc_val
+    Right((HInt(result), p2))
+
+// .hc:101
+pub fun hc_parse_binary_int_digits(s : string, pos : int, acc : int) : div (int, int, int)
+  if ((pos >= s.count) || !(hc_is_binary_char(hc_peek(s, pos)))) then
+    if (((hc_peek(s, pos) == "_") && ((pos + 1) < s.count)) && hc_is_binary_char(hc_peek(s, (pos + 1)))) then hc_parse_binary_int_digits(s, (pos + 1), acc) else (acc, pos, 0)
+  else
+    val digit : int = if (hc_peek(s, pos) == "1") then 1 else 0
+    val (hc_val, p2, cnt) = hc_parse_binary_int_digits(s, (pos + 1), ((acc * 2) + digit))
+    (hc_val, p2, (cnt + 1))
+
+// .hc:115
+pub fun hc_parse_binary_int(s : string, pos : int, hc_sign : string) : div either<string, (hml, int)>
+  val (hc_val, p2, cnt) = hc_parse_binary_int_digits(s, pos, 0)
+  if (cnt == 0) then
+    Left(("expected binary digits after 0b at position " ++ show(pos)))
+  else
+    val result : int = if (hc_sign == "-") then (0 - hc_val) else hc_val
+    Right((HInt(result), p2))
+
+// .hc:130
 pub fun hc_skip_ws(s : string, pos : int) : div int
   if (pos >= s.count) then pos else if hc_is_ws(hc_peek(s, pos)) then hc_skip_ws(s, (pos + 1)) else pos
 
-// .hc:56
+// .hc:135
 pub fun hc_skip_ws_and_newlines(s : string, pos : int) : div int
   if (pos >= s.count) then pos else if (hc_is_ws(hc_peek(s, pos)) || hc_is_newline(hc_peek(s, pos))) then hc_skip_ws_and_newlines(s, (pos + 1)) else pos
 
-// .hc:62
+// .hc:141
 pub fun hc_skip_to_eol(s : string, pos : int) : div int
   if (pos >= s.count) then pos else if (hc_peek(s, pos) == "\n") then pos else if (hc_peek(s, pos) == "\r") then pos else hc_skip_to_eol(s, (pos + 1))
 
-// .hc:69
+// .hc:148
 pub fun hc_skip_comment(s : string, pos : int) : div int
   if ((((pos + 1) < s.count) && (hc_peek(s, pos) == "/")) && (hc_peek(s, (pos + 1)) == "/")) then hc_skip_to_eol(s, (pos + 2)) else pos
 
-// .hc:76
+// .hc:155
 pub fun hc_skip_noise(s : string, pos : int) : div int
   val p1 : int = hc_skip_ws_and_newlines(s, pos)
   if ((((p1 + 1) < s.count) && (hc_peek(s, p1) == "/")) && (hc_peek(s, (p1 + 1)) == "/")) then
@@ -952,14 +1013,14 @@ pub fun hc_skip_noise(s : string, pos : int) : div int
   else
     p1
 
-// .hc:90
+// .hc:169
 pub fun hc_parse_bare_key(s : string, pos : int, acc : string) : div either<string, (string, int)>
   if ((pos >= s.count) || !(hc_is_bare_key_char(hc_peek(s, pos)))) then
     if (acc.count == 0) then Left(("expected key at position " ++ show(pos))) else Right((acc, pos))
   else
     hc_parse_bare_key(s, (pos + 1), (acc ++ hc_peek(s, pos)))
 
-// .hc:97
+// .hc:176
 pub fun hc_parse_escape_u4(s : string, pos : int, acc : string) : div either<string, (string, int)>
   match hc_parse_hex_digits(s, (pos + 2), 4, 0)
     Right((cp, p2)) ->
@@ -967,7 +1028,7 @@ pub fun hc_parse_escape_u4(s : string, pos : int, acc : string) : div either<str
     Left(e) ->
       Left(e)
 
-// .hc:103
+// .hc:182
 pub fun hc_parse_escape_u8(s : string, pos : int, acc : string) : div either<string, (string, int)>
   match hc_parse_hex_digits(s, (pos + 2), 8, 0)
     Right((cp, p2)) ->
@@ -975,7 +1036,7 @@ pub fun hc_parse_escape_u8(s : string, pos : int, acc : string) : div either<str
     Left(e) ->
       Left(e)
 
-// .hc:110
+// .hc:189
 pub fun hc_parse_escape(s : string, pos : int, acc : string) : div either<string, (string, int)>
   val next : string = hc_peek(s, (pos + 1))
   if (next == "n") then
@@ -984,13 +1045,17 @@ pub fun hc_parse_escape(s : string, pos : int, acc : string) : div either<string
     hc_parse_basic_string(s, (pos + 2), (acc ++ "\t"))
   else if (next == "r") then
     hc_parse_basic_string(s, (pos + 2), (acc ++ "\r"))
+  else if (next == "b") then
+    hc_parse_basic_string(s, (pos + 2), (acc ++ 8.char.string))
+  else if (next == "f") then
+    hc_parse_basic_string(s, (pos + 2), (acc ++ 12.char.string))
   else if (next == "\\") then
     hc_parse_basic_string(s, (pos + 2), (acc ++ "\\"))
   else if (next == "\"") then
     hc_parse_basic_string(s, (pos + 2), (acc ++ "\""))
   else if (next == "u") then hc_parse_escape_u4(s, pos, acc) else if (next == "U") then hc_parse_escape_u8(s, pos, acc) else Left(("unknown escape: \\" ++ next))
 
-// .hc:123
+// .hc:204
 pub fun hc_parse_basic_string(s : string, pos : int, acc : string) : div either<string, (string, int)>
   if (pos >= s.count) then
     Left("unterminated string")
@@ -998,15 +1063,15 @@ pub fun hc_parse_basic_string(s : string, pos : int, acc : string) : div either<
     Right((acc, (pos + 1)))
   else if (hc_peek(s, pos) == "\\") then if ((pos + 1) >= s.count) then Left("unterminated escape") else hc_parse_escape(s, pos, acc) else hc_parse_basic_string(s, (pos + 1), (acc ++ hc_peek(s, pos)))
 
-// .hc:133
+// .hc:214
 pub fun hc_parse_literal_string(s : string, pos : int, acc : string) : div either<string, (string, int)>
   if (pos >= s.count) then Left("unterminated literal string") else if (hc_peek(s, pos) == "\'") then Right((acc, (pos + 1))) else hc_parse_literal_string(s, (pos + 1), (acc ++ hc_peek(s, pos)))
 
-// .hc:139
+// .hc:220
 pub fun hc_parse_key(s : string, pos : int) : div either<string, (string, int)>
   if (hc_peek(s, pos) == "\"") then hc_parse_basic_string(s, (pos + 1), "") else if (hc_peek(s, pos) == "\'") then hc_parse_literal_string(s, (pos + 1), "") else hc_parse_bare_key(s, pos, "")
 
-// .hc:150
+// .hc:231
 pub fun hc_parse_int_digits(s : string, pos : int, acc : string) : div (string, int)
   if (pos >= s.count) then
     (acc, pos)
@@ -1014,7 +1079,7 @@ pub fun hc_parse_int_digits(s : string, pos : int, acc : string) : div (string, 
     hc_parse_int_digits(s, (pos + 1), (acc ++ hc_peek(s, pos)))
   else if (((hc_peek(s, pos) == "_") && ((pos + 1) < s.count)) && hc_is_digit(hc_peek(s, (pos + 1)))) then hc_parse_int_digits(s, (pos + 1), acc) else (acc, pos)
 
-// .hc:158
+// .hc:237
 pub fun hc_is_duration_unit(s : string, pos : int) : maybe<(string, int)>
   if ((((pos + 1) < s.count) && (hc_peek(s, pos) == "n")) && (hc_peek(s, (pos + 1)) == "s")) then
     Just(("ns", (pos + 2)))
@@ -1026,24 +1091,99 @@ pub fun hc_is_duration_unit(s : string, pos : int) : maybe<(string, int)>
     Just(("s", (pos + 1)))
   else if (hc_peek(s, pos) == "m") then Just(("m", (pos + 1))) else if (hc_peek(s, pos) == "h") then Just(("h", (pos + 1))) else if (hc_peek(s, pos) == "d") then Just(("d", (pos + 1))) else Nothing
 
-// .hc:168
+// .hc:255
+pub fun hc_validated_datetime(dt_str : string, pos : int) : either<string, (hml, int)>
+  if (hc_datetime_kind(dt_str) == "invalid") then Left(("invalid datetime: " ++ dt_str)) else Right((HDatetime(dt_str), pos))
+
+// .hc:259
+pub fun hc_finish_time_frac(s : string, pos : int, time_str : string) : div either<string, (hml, int)>
+  val (f, p2) = hc_parse_int_digits(s, pos, "")
+  hc_validated_datetime(((time_str ++ ".") ++ f), p2)
+
+// .hc:264
+pub fun hc_try_parse_time(s : string, pos : int, hour : string) : div either<string, (hml, int)>
+  if ((pos + 6) > s.count) then
+    Left("incomplete time")
+  else if ((((!(hc_is_digit(hc_peek(s, (pos + 1)))) || !(hc_is_digit(hc_peek(s, (pos + 2))))) || (hc_peek(s, (pos + 3)) != ":")) || !(hc_is_digit(hc_peek(s, (pos + 4))))) || !(hc_is_digit(hc_peek(s, (pos + 5))))) then
+    Left("invalid time format")
+  else
+    val time_str : string = ((((((hour ++ ":") ++ hc_peek(s, (pos + 1))) ++ hc_peek(s, (pos + 2))) ++ ":") ++ hc_peek(s, (pos + 4))) ++ hc_peek(s, (pos + 5)))
+    if (hc_peek(s, (pos + 6)) == ".") then hc_finish_time_frac(s, (pos + 7), time_str) else hc_validated_datetime(time_str, (pos + 6))
+
+// .hc:276
+pub fun hc_try_parse_tz_offset(s : string, pos : int, dt_prefix : string) : either<string, (hml, int)>
+  val hc_sign : string = hc_peek(s, pos)
+  if ((pos + 6) > s.count) then
+    Left("incomplete timezone offset")
+  else if ((((!(hc_is_digit(hc_peek(s, (pos + 1)))) || !(hc_is_digit(hc_peek(s, (pos + 2))))) || (hc_peek(s, (pos + 3)) != ":")) || !(hc_is_digit(hc_peek(s, (pos + 4))))) || !(hc_is_digit(hc_peek(s, (pos + 5))))) then
+    Left("invalid timezone offset format")
+  else
+    hc_validated_datetime(((((((dt_prefix ++ hc_sign) ++ hc_peek(s, (pos + 1))) ++ hc_peek(s, (pos + 2))) ++ ":") ++ hc_peek(s, (pos + 4))) ++ hc_peek(s, (pos + 5))), (pos + 6))
+
+// .hc:287
+pub fun hc_parse_datetime_offset(s : string, pos : int, date_str : string, time_str : string) : either<string, (hml, int)>
+  if ((hc_peek(s, pos) == "Z") || (hc_peek(s, pos) == "z")) then
+    hc_validated_datetime((((date_str ++ "T") ++ time_str) ++ "Z"), (pos + 1))
+  else if ((hc_peek(s, pos) == "+") || (hc_peek(s, pos) == "-")) then hc_try_parse_tz_offset(s, pos, ((date_str ++ "T") ++ time_str)) else hc_validated_datetime(((date_str ++ "T") ++ time_str), pos)
+
+// .hc:298
+pub fun hc_finish_datetime_frac(s : string, pos : int, date_str : string, time_str : string) : div either<string, (hml, int)>
+  val (f, p2) = hc_parse_int_digits(s, pos, "")
+  hc_parse_datetime_offset(s, p2, date_str, ((time_str ++ ".") ++ f))
+
+// .hc:303
+pub fun hc_finish_datetime(s : string, pos : int, date_str : string, time_str : string) : div either<string, (hml, int)>
+  if (hc_peek(s, pos) == ".") then hc_finish_datetime_frac(s, (pos + 1), date_str, time_str) else hc_parse_datetime_offset(s, pos, date_str, time_str)
+
+// .hc:308
+pub fun hc_try_parse_datetime_time(s : string, pos : int, date_str : string) : div either<string, (hml, int)>
+  if ((pos + 8) > s.count) then
+    Left("incomplete time in datetime")
+  else if (((((((!(hc_is_digit(hc_peek(s, pos))) || !(hc_is_digit(hc_peek(s, (pos + 1))))) || (hc_peek(s, (pos + 2)) != ":")) || !(hc_is_digit(hc_peek(s, (pos + 3))))) || !(hc_is_digit(hc_peek(s, (pos + 4))))) || (hc_peek(s, (pos + 5)) != ":")) || !(hc_is_digit(hc_peek(s, (pos + 6))))) || !(hc_is_digit(hc_peek(s, (pos + 7))))) then
+    Left("invalid time format in datetime")
+  else
+    val time_str : string = (((((((hc_peek(s, pos) ++ hc_peek(s, (pos + 1))) ++ ":") ++ hc_peek(s, (pos + 3))) ++ hc_peek(s, (pos + 4))) ++ ":") ++ hc_peek(s, (pos + 6))) ++ hc_peek(s, (pos + 7)))
+    hc_finish_datetime(s, (pos + 8), date_str, time_str)
+
+// .hc:319
+pub fun hc_try_parse_date(s : string, pos : int, year : string) : div either<string, (hml, int)>
+  if ((pos + 6) > s.count) then
+    Left("incomplete date")
+  else if ((((!(hc_is_digit(hc_peek(s, (pos + 1)))) || !(hc_is_digit(hc_peek(s, (pos + 2))))) || (hc_peek(s, (pos + 3)) != "-")) || !(hc_is_digit(hc_peek(s, (pos + 4))))) || !(hc_is_digit(hc_peek(s, (pos + 5))))) then
+    Left("invalid date format")
+  else
+    val date_str : string = ((((((year ++ "-") ++ hc_peek(s, (pos + 1))) ++ hc_peek(s, (pos + 2))) ++ "-") ++ hc_peek(s, (pos + 4))) ++ hc_peek(s, (pos + 5)))
+    if ((hc_peek(s, (pos + 6)) == "T") || (hc_peek(s, (pos + 6)) == "t")) then hc_try_parse_datetime_time(s, (pos + 7), date_str) else hc_validated_datetime(date_str, (pos + 6))
+
+// .hc:340
 pub fun hc_parse_number_or_duration(s : string, pos : int) : div either<string, (hml, int)>
   val sign_pos : int = if ((hc_peek(s, pos) == "+") || (hc_peek(s, pos) == "-")) then (pos + 1) else pos
   val sign_str : string = if (hc_peek(s, pos) == "-") then "-" else ""
-  val (digits_str, p2) = hc_parse_int_digits(s, sign_pos, "")
-  if (digits_str.count == 0) then
-    Left(("expected number at position " ++ show(pos)))
+  if ((hc_peek(s, sign_pos) == "0") && (hc_peek(s, (sign_pos + 1)) == "x")) then
+    hc_parse_hex_int(s, (sign_pos + 2), sign_str)
+  else if ((hc_peek(s, sign_pos) == "0") && (hc_peek(s, (sign_pos + 1)) == "o")) then
+    hc_parse_octal_int(s, (sign_pos + 2), sign_str)
+  else if ((hc_peek(s, sign_pos) == "0") && (hc_peek(s, (sign_pos + 1)) == "b")) then
+    hc_parse_binary_int(s, (sign_pos + 2), sign_str)
   else
-    if (sign_str == "") then
-      match hc_is_duration_unit(s, p2)
-        Just((unit, p3)) ->
-          Right((HDuration(digits_str.parse-int.default(0), unit), p3))
-        Nothing ->
-          hc_parse_number_rest(s, p2, (sign_str ++ digits_str))
+    val (digits_str, p2) = hc_parse_int_digits(s, sign_pos, "")
+    if (digits_str.count == 0) then
+      Left(("expected number at position " ++ show(pos)))
+    else if ((((sign_str == "") && (digits_str.count == 4)) && (hc_peek(s, p2) == "-")) && hc_is_digit(hc_peek(s, (p2 + 1)))) then
+      hc_try_parse_date(s, p2, digits_str)
+    else if ((((sign_str == "") && (digits_str.count == 2)) && (hc_peek(s, p2) == ":")) && hc_is_digit(hc_peek(s, (p2 + 1)))) then
+      hc_try_parse_time(s, p2, digits_str)
     else
-      hc_parse_number_rest(s, p2, (sign_str ++ digits_str))
+      if (sign_str == "") then
+        match hc_is_duration_unit(s, p2)
+          Just((unit, p3)) ->
+            Right((HDuration(digits_str.parse-int.default(0), unit), p3))
+          Nothing ->
+            hc_parse_number_rest(s, p2, (sign_str ++ digits_str))
+      else
+        hc_parse_number_rest(s, p2, (sign_str ++ digits_str))
 
-// .hc:185
+// .hc:374
 pub fun hc_parse_number_rest(s : string, pos : int, int_part : string) : div either<string, (hml, int)>
   if (hc_peek(s, pos) == ".") then
     val (frac, p2) = hc_parse_int_digits(s, (pos + 1), "")
@@ -1062,14 +1202,14 @@ pub fun hc_parse_number_rest(s : string, pos : int, int_part : string) : div eit
   else
     Right((HInt(int_part.parse-int.default(0)), pos))
 
-// .hc:206
+// .hc:396
 pub fun hc_parse_exponent(s : string, pos : int) : div (string, int)
   val start : int = if ((hc_peek(s, pos) == "+") || (hc_peek(s, pos) == "-")) then (pos + 1) else pos
   val hc_sign : string = if (hc_peek(s, pos) == "-") then "-" else ""
   val (digits_str, p2) = hc_parse_int_digits(s, start, "")
   ((hc_sign ++ digits_str), p2)
 
-// .hc:213
+// .hc:402
 pub fun hc_parse_array(s : string, pos : int, items : list<hml>) : div either<string, (hml, int)>
   val p1 : int = hc_skip_noise(s, pos)
   if (hc_peek(s, p1) == "]") then
@@ -1084,11 +1224,11 @@ pub fun hc_parse_array(s : string, pos : int, items : list<hml>) : div either<st
       Left(e) ->
         Left(e)
 
-// .hc:227
+// .hc:415
 pub fun hc_starts_with_at(s : string, pos : int, target : string) : bool
   if ((pos + target.count) > s.count) then False else (s.list.drop(pos).take(((pos + target.count)) - (pos)).string == target)
 
-// .hc:234
+// .hc:424
 pub fun hc_parse_string_value(s : string, p : int) : div either<string, (hml, int)>
   if hc_starts_with_at(s, p, "\"\"\"") then
     hc_parse_ml_basic_string(s, (p + 3), "")
@@ -1099,7 +1239,7 @@ pub fun hc_parse_string_value(s : string, p : int) : div either<string, (hml, in
       Left(e) ->
         Left(e)
 
-// .hc:244
+// .hc:433
 pub fun hc_parse_literal_value(s : string, p : int) : div either<string, (hml, int)>
   if hc_starts_with_at(s, p, "\'\'\'") then
     hc_parse_ml_literal_string(s, (p + 3), "")
@@ -1110,7 +1250,7 @@ pub fun hc_parse_literal_value(s : string, p : int) : div either<string, (hml, i
       Left(e) ->
         Left(e)
 
-// .hc:256
+// .hc:445
 pub fun hc_parse_value(s : string, pos : int) : div either<string, (hml, int)>
   val p : int = hc_skip_ws(s, pos)
   if (hc_peek(s, p) == "\"") then
@@ -1138,12 +1278,12 @@ pub fun hc_parse_value(s : string, pos : int) : div either<string, (hml, int)>
   else
     Left(((("unexpected character '" ++ hc_peek(s, p)) ++ "' at position ") ++ show(p)))
 
-// .hc:288
+// .hc:478
 pub fun hc_parse_ml_basic_string(s : string, pos : int, acc : string) : div either<string, (hml, int)>
   val start : int = if (hc_peek(s, pos) == "\n") then (pos + 1) else if ((hc_peek(s, pos) == "\r") && (hc_peek(s, (pos + 1)) == "\n")) then (pos + 2) else pos
   hc_parse_ml_basic_body(s, start, acc)
 
-// .hc:296
+// .hc:485
 pub fun hc_parse_ml_basic_escape(s : string, pos : int, acc : string) : div either<string, (hml, int)>
   if ((pos + 1) >= s.count) then
     Left("unterminated escape in multi-line string")
@@ -1153,13 +1293,19 @@ pub fun hc_parse_ml_basic_escape(s : string, pos : int, acc : string) : div eith
       hc_parse_ml_basic_body(s, (pos + 2), (acc ++ "\n"))
     else if (next == "t") then
       hc_parse_ml_basic_body(s, (pos + 2), (acc ++ "\t"))
+    else if (next == "r") then
+      hc_parse_ml_basic_body(s, (pos + 2), (acc ++ "\r"))
+    else if (next == "b") then
+      hc_parse_ml_basic_body(s, (pos + 2), (acc ++ 8.char.string))
+    else if (next == "f") then
+      hc_parse_ml_basic_body(s, (pos + 2), (acc ++ 12.char.string))
     else if (next == "\\") then
       hc_parse_ml_basic_body(s, (pos + 2), (acc ++ "\\"))
     else if (next == "\"") then
       hc_parse_ml_basic_body(s, (pos + 2), (acc ++ "\""))
     else if hc_is_newline(next) then hc_parse_ml_basic_body(s, hc_skip_ws_and_newlines(s, (pos + 1)), acc) else hc_parse_ml_basic_body(s, (pos + 2), ((acc ++ "\\") ++ next))
 
-// .hc:308
+// .hc:501
 pub fun hc_parse_ml_basic_body(s : string, pos : int, acc : string) : div either<string, (hml, int)>
   if (pos >= s.count) then
     Left("unterminated multi-line string")
@@ -1167,18 +1313,18 @@ pub fun hc_parse_ml_basic_body(s : string, pos : int, acc : string) : div either
     Right((HStr(acc), (pos + 3)))
   else if (hc_peek(s, pos) == "\\") then hc_parse_ml_basic_escape(s, pos, acc) else hc_parse_ml_basic_body(s, (pos + 1), (acc ++ hc_peek(s, pos)))
 
-// .hc:316
+// .hc:509
 pub fun hc_parse_ml_literal_string(s : string, pos : int, acc : string) : div either<string, (hml, int)>
   val start : int = if (hc_peek(s, pos) == "\n") then (pos + 1) else if ((hc_peek(s, pos) == "\r") && (hc_peek(s, (pos + 1)) == "\n")) then (pos + 2) else pos
   hc_parse_ml_literal_body(s, start, acc)
 
-// .hc:323
+// .hc:515
 pub fun hc_parse_ml_literal_body(s : string, pos : int, acc : string) : div either<string, (hml, int)>
   if (pos >= s.count) then
     Left("unterminated multi-line literal string")
   else if hc_starts_with_at(s, pos, "\'\'\'") then Right((HStr(acc), (pos + 3))) else hc_parse_ml_literal_body(s, (pos + 1), (acc ++ hc_peek(s, pos)))
 
-// .hc:334
+// .hc:527
 pub fun hc_parse_element_name(s : string, pos : int, acc : string) : div either<string, (string, int)>
   match hc_parse_bare_key(s, pos, "")
     Right((k, p2)) ->
@@ -1187,7 +1333,7 @@ pub fun hc_parse_element_name(s : string, pos : int, acc : string) : div either<
     Left(e) ->
       Left(e)
 
-// .hc:342
+// .hc:534
 pub fun hc_parse_attributes(s : string, pos : int, attrs : list<(string, hml)>) : div either<string, (list<(string, hml)>, int)>
   val p1 : int = hc_skip_noise(s, pos)
   if (hc_peek(s, p1) == ")") then
@@ -1210,7 +1356,7 @@ pub fun hc_parse_attributes(s : string, pos : int, attrs : list<(string, hml)>) 
       Left(e) ->
         Left(e)
 
-// .hc:372
+// .hc:562
 pub fun hc_parse_body(s : string, pos : int, nodes : list<hmlnode>) : div either<string, (list<hmlnode>, int)>
   val p1 : int = hc_skip_noise(s, pos)
   if (hc_peek(s, p1) == "}") then
@@ -1239,7 +1385,7 @@ pub fun hc_parse_body(s : string, pos : int, nodes : list<hmlnode>) : div either
       Left(e) ->
         Left(("unexpected content in body at position " ++ show(p1)))
 
-// .hc:401
+// .hc:594
 pub fun hc_parse_element(s : string, pos : int) : div either<string, (hml, int)>
   val p1 : int = (pos + 1)
   match hc_parse_element_name(s, p1, "")
@@ -1269,11 +1415,11 @@ pub fun hc_parse_element(s : string, pos : int) : div either<string, (hml, int)>
     Left(e) ->
       Left(e)
 
-// .hc:431
+// .hc:622
 pub fun hc_parse_inline_element(s : string, pos : int) : div either<string, (hml, int)>
   hc_parse_element(s, pos)
 
-// .hc:442
+// .hc:634
 pub fun hc_parse_document(s : string, pos : int, nodes : list<hmlnode>) : div either<string, list<hmlnode>>
   val p1 : int = hc_skip_noise(s, pos)
   if (p1 >= s.count) then
@@ -1303,6 +1449,6 @@ pub fun hc_parse_document(s : string, pos : int, nodes : list<hmlnode>) : div ei
       Left(_) ->
         Left(("unexpected content at position " ++ show(p1)))
 
-// .hc:472
+// .hc:664
 pub fun hc_hml_parse(input : string) : div either<string, list<hmlnode>>
   hc_parse_document(input, 0, [])

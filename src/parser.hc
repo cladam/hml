@@ -47,6 +47,85 @@ pub fun parse_hex_digits(s: string, pos: int, n: int, acc: int) : result<(int, i
 }
 
 // ============================================================
+// Radix integer helpers
+// ============================================================
+
+pub fun is_octal_char(c: string) : bool =>
+  c != "" && contains("01234567", c)
+
+pub fun is_binary_char(c: string) : bool =>
+  c == "0" || c == "1"
+
+pub fun parse_hex_int_digits(s: string, pos: int, acc: int) : (int, int, int) {
+  // returns (value, pos, count)
+  if pos >= str_length(s) || !is_hex_char(peek(s, pos)) {
+    if peek(s, pos) == "_" && pos + 1 < str_length(s) && is_hex_char(peek(s, pos + 1)) {
+      parse_hex_int_digits(s, pos + 1, acc)
+    }
+    else { (acc, pos, 0) }
+  }
+  else {
+    let (val, p2, cnt) = parse_hex_int_digits(s, pos + 1, acc * 16 + hex_digit_val(peek(s, pos)))
+    (val, p2, cnt + 1)
+  }
+}
+
+pub fun parse_hex_int(s: string, pos: int, sign: string) : result<(Hml, int), string> {
+  let (val, p2, cnt) = parse_hex_int_digits(s, pos, 0)
+  if cnt == 0 { Err("expected hex digits after 0x at position " + show(pos)) }
+  else {
+    let result = if sign == "-" { 0 - val } else { val }
+    Ok((HInt(result), p2))
+  }
+}
+
+pub fun parse_octal_int_digits(s: string, pos: int, acc: int) : (int, int, int) {
+  if pos >= str_length(s) || !is_octal_char(peek(s, pos)) {
+    if peek(s, pos) == "_" && pos + 1 < str_length(s) && is_octal_char(peek(s, pos + 1)) {
+      parse_octal_int_digits(s, pos + 1, acc)
+    }
+    else { (acc, pos, 0) }
+  }
+  else {
+    let digit = hex_digit_val(peek(s, pos))
+    let (val, p2, cnt) = parse_octal_int_digits(s, pos + 1, acc * 8 + digit)
+    (val, p2, cnt + 1)
+  }
+}
+
+pub fun parse_octal_int(s: string, pos: int, sign: string) : result<(Hml, int), string> {
+  let (val, p2, cnt) = parse_octal_int_digits(s, pos, 0)
+  if cnt == 0 { Err("expected octal digits after 0o at position " + show(pos)) }
+  else {
+    let result = if sign == "-" { 0 - val } else { val }
+    Ok((HInt(result), p2))
+  }
+}
+
+pub fun parse_binary_int_digits(s: string, pos: int, acc: int) : (int, int, int) {
+  if pos >= str_length(s) || !is_binary_char(peek(s, pos)) {
+    if peek(s, pos) == "_" && pos + 1 < str_length(s) && is_binary_char(peek(s, pos + 1)) {
+      parse_binary_int_digits(s, pos + 1, acc)
+    }
+    else { (acc, pos, 0) }
+  }
+  else {
+    let digit = if peek(s, pos) == "1" { 1 } else { 0 }
+    let (val, p2, cnt) = parse_binary_int_digits(s, pos + 1, acc * 2 + digit)
+    (val, p2, cnt + 1)
+  }
+}
+
+pub fun parse_binary_int(s: string, pos: int, sign: string) : result<(Hml, int), string> {
+  let (val, p2, cnt) = parse_binary_int_digits(s, pos, 0)
+  if cnt == 0 { Err("expected binary digits after 0b at position " + show(pos)) }
+  else {
+    let result = if sign == "-" { 0 - val } else { val }
+    Ok((HInt(result), p2))
+  }
+}
+
+// ============================================================
 // Scanning helpers
 // ============================================================
 
@@ -116,6 +195,8 @@ pub fun parse_escape(s: string, pos: int, acc: string) : result<(string, int), s
   if next == "n" { parse_basic_string(s, pos + 2, acc + "\n") }
   else if next == "t" { parse_basic_string(s, pos + 2, acc + "\t") }
   else if next == "r" { parse_basic_string(s, pos + 2, acc + "\r") }
+  else if next == "b" { parse_basic_string(s, pos + 2, acc + char_to_string(chr(8))) }
+  else if next == "f" { parse_basic_string(s, pos + 2, acc + char_to_string(chr(12))) }
   else if next == "\\" { parse_basic_string(s, pos + 2, acc + "\\") }
   else if next == "\"" { parse_basic_string(s, pos + 2, acc + "\"") }
   else if next == "u" { parse_escape_u4(s, pos, acc) }
@@ -169,20 +250,129 @@ pub fun is_duration_unit(s: string, pos: int) : maybe<(string, int)> {
   else { None }
 }
 
+// ============================================================
+// Date-time parsing (RFC 3339)
+// ============================================================
+
+pub fun validated_datetime(dt_str: string, pos: int) : result<(Hml, int), string> {
+  if datetime_kind(dt_str) == "invalid" { Err("invalid datetime: " + dt_str) }
+  else { Ok((HDatetime(dt_str), pos)) }
+}
+
+pub fun finish_time_frac(s: string, pos: int, time_str: string) : result<(Hml, int), string> {
+  let (f, p2) = parse_int_digits(s, pos, "")
+  validated_datetime(time_str + "." + f, p2)
+}
+
+pub fun try_parse_time(s: string, pos: int, hour: string) : result<(Hml, int), string> {
+  // pos is at ':' after HH. Match :MM:SS [.frac]
+  if pos + 6 > str_length(s) { Err("incomplete time") }
+  else if !is_digit(peek(s, pos+1)) || !is_digit(peek(s, pos+2)) || peek(s, pos+3) != ":" || !is_digit(peek(s, pos+4)) || !is_digit(peek(s, pos+5)) {
+    Err("invalid time format")
+  }
+  else {
+    let time_str = hour + ":" + peek(s, pos+1) + peek(s, pos+2) + ":" + peek(s, pos+4) + peek(s, pos+5)
+    if peek(s, pos + 6) == "." { finish_time_frac(s, pos + 7, time_str) }
+    else { validated_datetime(time_str, pos + 6) }
+  }
+}
+
+pub fun try_parse_tz_offset(s: string, pos: int, dt_prefix: string) : result<(Hml, int), string> {
+  let sign = peek(s, pos)
+  if pos + 6 > str_length(s) { Err("incomplete timezone offset") }
+  else if !is_digit(peek(s, pos+1)) || !is_digit(peek(s, pos+2)) || peek(s, pos+3) != ":" || !is_digit(peek(s, pos+4)) || !is_digit(peek(s, pos+5)) {
+    Err("invalid timezone offset format")
+  }
+  else {
+    validated_datetime(dt_prefix + sign + peek(s, pos+1) + peek(s, pos+2) + ":" + peek(s, pos+4) + peek(s, pos+5), pos + 6)
+  }
+}
+
+pub fun parse_datetime_offset(s: string, pos: int, date_str: string, time_str: string) : result<(Hml, int), string> {
+  if peek(s, pos) == "Z" || peek(s, pos) == "z" {
+    validated_datetime(date_str + "T" + time_str + "Z", pos + 1)
+  }
+  else if peek(s, pos) == "+" || peek(s, pos) == "-" {
+    try_parse_tz_offset(s, pos, date_str + "T" + time_str)
+  }
+  else { validated_datetime(date_str + "T" + time_str, pos) }
+}
+
+pub fun finish_datetime_frac(s: string, pos: int, date_str: string, time_str: string) : result<(Hml, int), string> {
+  let (f, p2) = parse_int_digits(s, pos, "")
+  parse_datetime_offset(s, p2, date_str, time_str + "." + f)
+}
+
+pub fun finish_datetime(s: string, pos: int, date_str: string, time_str: string) : result<(Hml, int), string> {
+  if peek(s, pos) == "." { finish_datetime_frac(s, pos + 1, date_str, time_str) }
+  else { parse_datetime_offset(s, pos, date_str, time_str) }
+}
+
+pub fun try_parse_datetime_time(s: string, pos: int, date_str: string) : result<(Hml, int), string> {
+  // pos is right after T. Parse HH:MM:SS [.frac] [offset]
+  if pos + 8 > str_length(s) { Err("incomplete time in datetime") }
+  else if !is_digit(peek(s, pos)) || !is_digit(peek(s, pos+1)) || peek(s, pos+2) != ":" || !is_digit(peek(s, pos+3)) || !is_digit(peek(s, pos+4)) || peek(s, pos+5) != ":" || !is_digit(peek(s, pos+6)) || !is_digit(peek(s, pos+7)) {
+    Err("invalid time format in datetime")
+  }
+  else {
+    let time_str = peek(s, pos) + peek(s, pos+1) + ":" + peek(s, pos+3) + peek(s, pos+4) + ":" + peek(s, pos+6) + peek(s, pos+7)
+    finish_datetime(s, pos + 8, date_str, time_str)
+  }
+}
+
+pub fun try_parse_date(s: string, pos: int, year: string) : result<(Hml, int), string> {
+  // pos is at '-' after YYYY. Match -MM-DD [T time [offset]]
+  if pos + 6 > str_length(s) { Err("incomplete date") }
+  else if !is_digit(peek(s, pos+1)) || !is_digit(peek(s, pos+2)) || peek(s, pos+3) != "-" || !is_digit(peek(s, pos+4)) || !is_digit(peek(s, pos+5)) {
+    Err("invalid date format")
+  }
+  else {
+    let date_str = year + "-" + peek(s, pos+1) + peek(s, pos+2) + "-" + peek(s, pos+4) + peek(s, pos+5)
+    if peek(s, pos + 6) == "T" || peek(s, pos + 6) == "t" {
+      try_parse_datetime_time(s, pos + 7, date_str)
+    }
+    else { validated_datetime(date_str, pos + 6) }
+  }
+}
+
+// ============================================================
+// Number / duration / datetime dispatch
+// ============================================================
+
 pub fun parse_number_or_duration(s: string, pos: int) : result<(Hml, int), string> {
   let sign_pos = if peek(s, pos) == "+" || peek(s, pos) == "-" { pos + 1 } else { pos }
   let sign_str = if peek(s, pos) == "-" { "-" } else { "" }
-  let (digits_str, p2) = parse_int_digits(s, sign_pos, "")
-  if str_length(digits_str) == 0 { Err("expected number at position " + show(pos)) }
+  // Check for 0x, 0o, 0b prefixes
+  if peek(s, sign_pos) == "0" && peek(s, sign_pos + 1) == "x" {
+    parse_hex_int(s, sign_pos + 2, sign_str)
+  }
+  else if peek(s, sign_pos) == "0" && peek(s, sign_pos + 1) == "o" {
+    parse_octal_int(s, sign_pos + 2, sign_str)
+  }
+  else if peek(s, sign_pos) == "0" && peek(s, sign_pos + 1) == "b" {
+    parse_binary_int(s, sign_pos + 2, sign_str)
+  }
   else {
-    // Check for duration suffix (no sign allowed for durations)
-    if sign_str == "" {
-      match is_duration_unit(s, p2) {
-        Some((unit, p3)) => Ok((HDuration(unwrap_maybe_or(parse_int(digits_str), 0), unit), p3)),
-        None => parse_number_rest(s, p2, sign_str + digits_str)
-      }
+    let (digits_str, p2) = parse_int_digits(s, sign_pos, "")
+    if str_length(digits_str) == 0 { Err("expected number at position " + show(pos)) }
+    // Date: YYYY-MM-DD...
+    else if sign_str == "" && str_length(digits_str) == 4 && peek(s, p2) == "-" && is_digit(peek(s, p2 + 1)) {
+      try_parse_date(s, p2, digits_str)
     }
-    else { parse_number_rest(s, p2, sign_str + digits_str) }
+    // Time: HH:MM:SS...
+    else if sign_str == "" && str_length(digits_str) == 2 && peek(s, p2) == ":" && is_digit(peek(s, p2 + 1)) {
+      try_parse_time(s, p2, digits_str)
+    }
+    else {
+      // Check for duration suffix (no sign allowed for durations)
+      if sign_str == "" {
+        match is_duration_unit(s, p2) {
+          Some((unit, p3)) => Ok((HDuration(unwrap_maybe_or(parse_int(digits_str), 0), unit), p3)),
+          None => parse_number_rest(s, p2, sign_str + digits_str)
+        }
+      }
+      else { parse_number_rest(s, p2, sign_str + digits_str) }
+    }
   }
 }
 
@@ -302,6 +492,9 @@ pub fun parse_ml_basic_escape(s: string, pos: int, acc: string) : result<(Hml, i
     let next = peek(s, pos + 1)
     if next == "n" { parse_ml_basic_body(s, pos + 2, acc + "\n") }
     else if next == "t" { parse_ml_basic_body(s, pos + 2, acc + "\t") }
+    else if next == "r" { parse_ml_basic_body(s, pos + 2, acc + "\r") }
+    else if next == "b" { parse_ml_basic_body(s, pos + 2, acc + char_to_string(chr(8))) }
+    else if next == "f" { parse_ml_basic_body(s, pos + 2, acc + char_to_string(chr(12))) }
     else if next == "\\" { parse_ml_basic_body(s, pos + 2, acc + "\\") }
     else if next == "\"" { parse_ml_basic_body(s, pos + 2, acc + "\"") }
     else if is_newline(next) { parse_ml_basic_body(s, skip_ws_and_newlines(s, pos + 1), acc) }

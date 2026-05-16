@@ -72,6 +72,7 @@ fun main() {
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `hml_parse` | `string -> result<list<HmlNode>, string>` | Parse an HML document |
+| `hml_parse_file` | `string -> result<list<HmlNode>, string>` | Parse a file with `#include` support |
 
 ### Element Access
 
@@ -144,6 +145,7 @@ hica test tests/test_elements.hc
 hica test tests/test_document.hc
 hica test tests/test_api.hc
 hica test tests/test_errors.hc
+hica test tests/test_include.hc
 ```
 
 ## Examples
@@ -154,6 +156,7 @@ See the [examples/](examples/) directory:
 - `read_config.hc`: Read and parse an external `.hml` file
 - `nested.hc`: Navigate deeply nested elements
 - `repeated.hc`: Work with repeated elements (implicit arrays)
+- `include.hc`: Compose configs from multiple files with `#include`
 
 ## License
 

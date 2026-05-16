@@ -224,7 +224,7 @@ fun hc_unlines(ls : list<string>)
 fun hc_count_substr(s : string, hc_sub : string)
   (list/length((if hc_sub.is-empty then s.list.map(fn(c) c.string) else s.split(hc_sub))) - 1)
 
-fun hc_repeat_str(s : string, n : int) : div string
+fun hc_repeat_str(s : string, n : int)
   if (n <= 0) then "" else (s ++ hc_repeat_str(s, (n - 1)))
 
 fun hc_pad_left(s : string, width : int, ch : string)
@@ -568,14 +568,14 @@ fun hc_offset_to_minutes(s : string) : either<string, int>
       Nothing ->
         Left("invalid offset hours")
 
-fun hc_list_int_nth(xs : list<int>, i : int) : div int
+fun hc_list_int_nth(xs : list<int>, i : int)
   match xs
     Nil ->
       0
     Cons(x, rest) ->
       if (i == 0) then x else hc_list_int_nth(rest, (i - 1))
 
-fun hc_day_of_week(s : string) : div either<string, string>
+fun hc_day_of_week(s : string)
   if !(hc_is_valid_date(s)) then
     Left(("invalid date: " ++ s))
   else
@@ -863,7 +863,7 @@ fun hc_write_lines(file_path : string, xs : list<string>)
   write-text-file(file_path.path, hc_unlines(xs))
 
 // .hc:6
-pub fun hc_hml_show(v : hml) : div string
+pub fun hc_hml_show(v : hml)
   match v
     HStr(s) ->
       (("\"" ++ s) ++ "\"")
@@ -885,13 +885,13 @@ pub fun hc_hml_show(v : hml) : div string
       hc_show_element(name, attrs, body)
 
 // .hc:17
-pub fun hc_show_element(name : string, attrs : list<(string, hml)>, body : list<hmlnode>) : div string
+pub fun hc_show_element(name : string, attrs : list<(string, hml)>, body : list<hmlnode>)
   val attr_str : string = if (list/length(attrs) == 0) then "" else (("(" ++ map(attrs, fn(a) hc_show_attr(a)).join(", ")) ++ ")")
   val body_str : string = if (list/length(body) == 0) then "" else " { ... }"
   ((("@" ++ name) ++ attr_str) ++ body_str)
 
 // .hc:25
-pub fun hc_show_attr(entry : (string, hml)) : div string
+pub fun hc_show_attr(entry : (string, hml))
   match entry.snd
     HBool(True) ->
       entry.fst
@@ -899,15 +899,15 @@ pub fun hc_show_attr(entry : (string, hml)) : div string
       ((entry.fst ++ ": ") ++ hc_hml_show(entry.snd))
 
 // .hc:35
-pub fun hc_make_indent(n : int) : div string
+pub fun hc_make_indent(n : int)
   if (n <= 0) then "" else ("    " ++ hc_make_indent((n - 1)))
 
 // .hc:38
-pub fun hc_hml_pretty(nodes : list<hmlnode>, indent : int) : div string
+pub fun hc_hml_pretty(nodes : list<hmlnode>, indent : int)
   map(nodes, fn(node) hc_pretty_node(node, indent)).join("\n")
 
 // .hc:41
-pub fun hc_pretty_node(node : hmlnode, indent : int) : div string
+pub fun hc_pretty_node(node : hmlnode, indent : int)
   val pad : string = hc_make_indent(indent)
   match node
     NProp(key, hc_val) ->

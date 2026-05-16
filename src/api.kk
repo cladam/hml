@@ -224,7 +224,7 @@ fun hc_unlines(ls : list<string>)
 fun hc_count_substr(s : string, hc_sub : string)
   (list/length((if hc_sub.is-empty then s.list.map(fn(c) c.string) else s.split(hc_sub))) - 1)
 
-fun hc_repeat_str(s : string, n : int) : div string
+fun hc_repeat_str(s : string, n : int)
   if (n <= 0) then "" else (s ++ hc_repeat_str(s, (n - 1)))
 
 fun hc_pad_left(s : string, width : int, ch : string)
@@ -568,14 +568,14 @@ fun hc_offset_to_minutes(s : string) : either<string, int>
       Nothing ->
         Left("invalid offset hours")
 
-fun hc_list_int_nth(xs : list<int>, i : int) : div int
+fun hc_list_int_nth(xs : list<int>, i : int)
   match xs
     Nil ->
       0
     Cons(x, rest) ->
       if (i == 0) then x else hc_list_int_nth(rest, (i - 1))
 
-fun hc_day_of_week(s : string) : div either<string, string>
+fun hc_day_of_week(s : string)
   if !(hc_is_valid_date(s)) then
     Left(("invalid date: " ++ s))
   else
@@ -863,7 +863,7 @@ fun hc_write_lines(file_path : string, xs : list<string>)
   write-text-file(file_path.path, hc_unlines(xs))
 
 // .hc:6
-pub fun hc_hml_get(nodes : list<hmlnode>, key : string) : div maybe<hml>
+pub fun hc_hml_get(nodes : list<hmlnode>, key : string)
   match nodes
     Nil ->
       Nothing
@@ -873,7 +873,7 @@ pub fun hc_hml_get(nodes : list<hmlnode>, key : string) : div maybe<hml>
       hc_hml_get(rest, key)
 
 // .hc:13
-pub fun hc_hml_elem(nodes : list<hmlnode>, name : string) : div maybe<hml>
+pub fun hc_hml_elem(nodes : list<hmlnode>, name : string)
   match nodes
     Nil ->
       Nothing
@@ -883,7 +883,7 @@ pub fun hc_hml_elem(nodes : list<hmlnode>, name : string) : div maybe<hml>
       hc_hml_elem(rest, name)
 
 // .hc:21
-pub fun hc_hml_elems(nodes : list<hmlnode>, name : string) : div list<hml>
+pub fun hc_hml_elems(nodes : list<hmlnode>, name : string)
   match nodes
     Nil ->
       []
@@ -965,7 +965,7 @@ pub fun hc_hml_attrs(v : hml) : maybe<list<(string, hml)>>
       Nothing
 
 // .hc:81
-pub fun hc_hml_attr(v : hml, key : string) : div maybe<hml>
+pub fun hc_hml_attr(v : hml, key : string)
   match v
     HElement(_, attrs, _) ->
       hc_find_attr(attrs, key)
@@ -973,7 +973,7 @@ pub fun hc_hml_attr(v : hml, key : string) : div maybe<hml>
       Nothing
 
 // .hc:86
-pub fun hc_find_attr(attrs : list<(string, hml)>, key : string) : div maybe<hml>
+pub fun hc_find_attr(attrs : list<(string, hml)>, key : string)
   match attrs
     Nil ->
       Nothing
@@ -989,11 +989,11 @@ pub fun hc_hml_ok(r : either<string, list<hmlnode>>) : maybe<list<hmlnode>>
       Nothing
 
 // .hc:102
-pub fun hc_at(nodes : list<hmlnode>, key : string) : div maybe<hml>
+pub fun hc_at(nodes : list<hmlnode>, key : string)
   hc_hml_get(nodes, key)
 
 // .hc:106
-pub fun hc_elem_at(nodes : list<hmlnode>, name : string) : div maybe<hml>
+pub fun hc_elem_at(nodes : list<hmlnode>, name : string)
   hc_hml_elem(nodes, name)
 
 // .hc:109

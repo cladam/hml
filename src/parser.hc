@@ -745,3 +745,107 @@ pub fun parse_document(s: string, pos: int, nodes: list<HmlNode>) : result<list<
 
 pub fun hml_parse(input: string) : result<list<HmlNode>, string> =>
   parse_document(input, 0, [])
+
+// ============================================================
+// File-based parsing with #include support
+// ============================================================
+
+pub fun find_last_slash(s: string, pos: int, last_end: int) : int {
+  if pos >= str_length(s) { last_end }
+  else if peek(s, pos) == "/" { find_last_slash(s, pos + 1, pos + 1) }
+  else { find_last_slash(s, pos + 1, last_end) }
+}
+
+pub fun dir_of_path(path: string) : string =>
+  path[0: find_last_slash(path, 0, 0)]
+
+pub fun resolve_include_path(base_dir: string, rel: string) : string =>
+  base_dir + rel
+
+pub fun list_contains(items: list<string>, target: string) : bool {
+  match items {
+    [] => false,
+    [x, ..rest] => if x == target { true } else { list_contains(rest, target) }
+  }
+}
+
+pub fun parse_include_path(s: string, pos: int) : maybe<(string, int)> {
+  // pos is at '#'. Check for #include "path"
+  if !starts_with_at(s, pos, "#include") { None }
+  else {
+    let p1 = skip_ws(s, pos + 8)
+    if peek(s, p1) == "\"" {
+      match parse_basic_string(s, p1 + 1, "") {
+        Ok((path, p2)) => Some((path, p2)),
+        Err(_) => None
+      }
+    }
+    else { None }
+  }
+}
+
+pub fun include_file_nodes(s: string, p2: int, content: string, full_path: string, nodes: list<HmlNode>, base_dir: string, seen: list<string>) : result<list<HmlNode>, string> {
+  let inc_base = dir_of_path(full_path)
+  match parse_file_doc(content, 0, [], inc_base, seen + [full_path]) {
+    Ok(inc_nodes) => parse_file_doc(s, skip_to_eol(s, p2), nodes + inc_nodes, base_dir, seen),
+    Err(e) => Err(e)
+  }
+}
+
+pub fun parse_file_doc(s: string, pos: int, nodes: list<HmlNode>, base_dir: string, seen: list<string>) : result<list<HmlNode>, string> {
+  let p1 = skip_noise(s, pos)
+  if p1 >= str_length(s) { Ok(nodes) }
+  else if peek(s, p1) == "@" {
+    match parse_element(s, p1) {
+      Ok((elem, p2)) => parse_file_doc(s, p2, nodes + [NElem(elem)], base_dir, seen),
+      Err(e) => Err(e)
+    }
+  }
+  else if peek(s, p1) == "#" {
+    match parse_include_path(s, p1) {
+      Some((path, p2)) => {
+        let full_path = resolve_include_path(base_dir, path)
+        if list_contains(seen, full_path) { Err("circular include: " + full_path) }
+        else {
+          match read_file(full_path) {
+            Ok(content) => include_file_nodes(s, p2, content, full_path, nodes, base_dir, seen),
+            Err(_) => Err("cannot read included file: " + full_path)
+          }
+        }
+      },
+      None => parse_file_doc(s, skip_to_eol(s, p1), nodes, base_dir, seen)
+    }
+  }
+  else {
+    match parse_key_path(s, p1) {
+      Ok((segments, p2)) => {
+        let p3 = skip_ws(s, p2)
+        if peek(s, p3) == ":" {
+          let p4 = skip_ws(s, p3 + 1)
+          match parse_value(s, p4) {
+            Ok((val, p5)) => {
+              let new_node = wrap_dotted_value(segments, val)
+              if length(segments) > 1 { parse_file_doc(s, p5, insert_or_merge(nodes, new_node), base_dir, seen) }
+              else { parse_file_doc(s, p5, nodes + [new_node], base_dir, seen) }
+            },
+            Err(e) => Err(e)
+          }
+        }
+        else { Err("expected ':' after key at position " + show(p3)) }
+      },
+      Err(_) => Err("unexpected content at position " + show(p1))
+    }
+  }
+}
+
+pub fun hml_parse_file_content(content: string, path: string) : result<list<HmlNode>, string> {
+  let base = dir_of_path(path)
+  parse_file_doc(content, 0, [], base, [path])
+}
+
+pub fun hml_parse_file(path: string) : result<list<HmlNode>, string> {
+  match read_file(path) {
+    Ok(content) => hml_parse_file_content(content, path),
+    Err(_) => Err("cannot read file: " + path)
+  }
+}

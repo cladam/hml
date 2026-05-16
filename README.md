@@ -4,7 +4,7 @@ An HML (Hica Markup Language) parser library written in [hica](https://github.co
 
 HML is a structured configuration and document language that combines the
 semantic strength of XML (elements with identity/metadata) with the readability
-of TOML/YAML. See [HML-SPEC-DRAFT.md](HML-SPEC-DRAFT.md) for the full spec.
+of TOML/YAML. See [HML-Specification.md](HML-Specification.md) for the full spec.
 
 
 ## Installation

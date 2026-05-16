@@ -225,7 +225,7 @@ fun hc_unlines(ls : list<string>)
 fun hc_count_substr(s : string, hc_sub : string)
   (list/length((if hc_sub.is-empty then s.list.map(fn(c) c.string) else s.split(hc_sub))) - 1)
 
-fun hc_repeat_str(s : string, n : int) : div string
+fun hc_repeat_str(s : string, n : int)
   if (n <= 0) then "" else (s ++ hc_repeat_str(s, (n - 1)))
 
 fun hc_pad_left(s : string, width : int, ch : string)
@@ -569,14 +569,14 @@ fun hc_offset_to_minutes(s : string) : either<string, int>
       Nothing ->
         Left("invalid offset hours")
 
-fun hc_list_int_nth(xs : list<int>, i : int) : div int
+fun hc_list_int_nth(xs : list<int>, i : int)
   match xs
     Nil ->
       0
     Cons(x, rest) ->
       if (i == 0) then x else hc_list_int_nth(rest, (i - 1))
 
-fun hc_day_of_week(s : string) : div either<string, string>
+fun hc_day_of_week(s : string)
   if !(hc_is_valid_date(s)) then
     Left(("invalid date: " ++ s))
   else

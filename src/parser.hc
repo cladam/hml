@@ -226,6 +226,29 @@ pub fun parse_key(s: string, pos: int) : result<(string, int), string> {
   else { parse_bare_key(s, pos, "") }
 }
 
+pub fun parse_key_path(s: string, pos: int) : result<(list<string>, int), string> {
+  match parse_key(s, pos) {
+    Ok((key, p2)) => {
+      if peek(s, p2) == "." {
+        match parse_key_path(s, p2 + 1) {
+          Ok((rest, p3)) => Ok(([key] + rest, p3)),
+          Err(e) => Err(e)
+        }
+      }
+      else { Ok(([key], p2)) }
+    },
+    Err(e) => Err(e)
+  }
+}
+
+pub fun wrap_dotted_value(segments: list<string>, val: Hml) : HmlNode {
+  match segments {
+    [k] => NProp(k, val),
+    [k, ..rest] => NElem(HElement(k, [], [wrap_dotted_value(rest, val)])),
+    _ => NProp("", val)
+  }
+}
+
 // ============================================================
 // Value parsing
 // ============================================================
@@ -567,6 +590,53 @@ pub fun parse_attributes(s: string, pos: int, attrs: list<(string, Hml)>) : resu
   }
 }
 
+// ============================================================
+// Body node merging (for dotted keys)
+// ============================================================
+
+pub fun is_elem_named(node: HmlNode, name: string) : bool {
+  match node {
+    NElem(HElement(n, _, _)) => n == name,
+    _ => false
+  }
+}
+
+pub fun merge_two_elems(existing: HmlNode, new_body: list<HmlNode>) : HmlNode {
+  match existing {
+    NElem(HElement(n, a, b)) => NElem(HElement(n, a, merge_body(b + new_body))),
+    _ => existing
+  }
+}
+
+pub fun try_merge_elem(nodes: list<HmlNode>, name: string, attrs: list<(string, Hml)>, body: list<HmlNode>, checked: list<HmlNode>) : list<HmlNode> {
+  match nodes {
+    [] => checked + [NElem(HElement(name, attrs, body))],
+    [first, ..rest] => {
+      if is_elem_named(first, name) {
+        checked + [merge_two_elems(first, body)] + rest
+      }
+      else { try_merge_elem(rest, name, attrs, body, checked + [first]) }
+    }
+  }
+}
+
+pub fun insert_or_merge(acc: list<HmlNode>, node: HmlNode) : list<HmlNode> {
+  match node {
+    NElem(HElement(name, attrs, body)) => try_merge_elem(acc, name, attrs, body, []),
+    _ => acc + [node]
+  }
+}
+
+pub fun merge_body_acc(remaining: list<HmlNode>, acc: list<HmlNode>) : list<HmlNode> {
+  match remaining {
+    [] => acc,
+    [node, ..rest] => merge_body_acc(rest, insert_or_merge(acc, node))
+  }
+}
+
+pub fun merge_body(nodes: list<HmlNode>) : list<HmlNode> =>
+  merge_body_acc(nodes, [])
+
 pub fun parse_body(s: string, pos: int, nodes: list<HmlNode>) : result<(list<HmlNode>, int), string> {
   let p1 = skip_noise(s, pos)
   if peek(s, p1) == "}" { Ok((nodes, p1 + 1)) }
@@ -578,20 +648,23 @@ pub fun parse_body(s: string, pos: int, nodes: list<HmlNode>) : result<(list<Hml
   }
   else if peek(s, p1) == "" { Err("unterminated body (missing '}')") }
   else {
-    // Try to parse as property (key: value)
-    match parse_key(s, p1) {
-      Ok((key, p2)) => {
+    match parse_key_path(s, p1) {
+      Ok((segments, p2)) => {
         let p3 = skip_ws(s, p2)
         if peek(s, p3) == ":" {
           let p4 = skip_ws(s, p3 + 1)
           match parse_value(s, p4) {
-            Ok((val, p5)) => parse_body(s, p5, nodes + [NProp(key, val)]),
+            Ok((val, p5)) => {
+              let new_node = wrap_dotted_value(segments, val)
+              if length(segments) > 1 { parse_body(s, p5, insert_or_merge(nodes, new_node)) }
+              else { parse_body(s, p5, nodes + [new_node]) }
+            },
             Err(e) => Err(e)
           }
         }
-        else { Err("expected ':' after key '" + key + "' at position " + show(p3)) }
+        else { Err("expected ':' after key at position " + show(p3)) }
       },
-      Err(e) => Err("unexpected content in body at position " + show(p1))
+      Err(_) => Err("unexpected content in body at position " + show(p1))
     }
   }
 }
@@ -649,18 +722,21 @@ pub fun parse_document(s: string, pos: int, nodes: list<HmlNode>) : result<list<
     parse_document(s, p2, nodes)
   }
   else {
-    // Try as property
-    match parse_key(s, p1) {
-      Ok((key, p2)) => {
+    match parse_key_path(s, p1) {
+      Ok((segments, p2)) => {
         let p3 = skip_ws(s, p2)
         if peek(s, p3) == ":" {
           let p4 = skip_ws(s, p3 + 1)
           match parse_value(s, p4) {
-            Ok((val, p5)) => parse_document(s, p5, nodes + [NProp(key, val)]),
+            Ok((val, p5)) => {
+              let new_node = wrap_dotted_value(segments, val)
+              if length(segments) > 1 { parse_document(s, p5, insert_or_merge(nodes, new_node)) }
+              else { parse_document(s, p5, nodes + [new_node]) }
+            },
             Err(e) => Err(e)
           }
         }
-        else { Err("expected ':' after key '" + key + "' at position " + show(p3)) }
+        else { Err("expected ':' after key at position " + show(p3)) }
       },
       Err(_) => Err("unexpected content at position " + show(p1))
     }

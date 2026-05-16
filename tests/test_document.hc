@@ -233,3 +233,125 @@ test "array property in body" {
     Err(_) => assert(false)
   }
 }
+
+// ============================================================
+// Dotted keys
+// ============================================================
+
+test "simple dotted key" {
+  let input = "database.host: \"localhost\""
+  match hml_parse(input) {
+    Ok(nodes) => {
+      match elem_at(nodes, "database") {
+        Some(el) => {
+          match hml_body(el) {
+            Some(body) => {
+              match at(body, "host") |> as_str {
+                Some(v) => assert(v == "localhost"),
+                None => assert(false)
+              }
+            },
+            None => assert(false)
+          }
+        },
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "dotted keys merge same prefix" {
+  let input = "database.host: \"localhost\"\ndatabase.port: 5432"
+  match hml_parse(input) {
+    Ok(nodes) => {
+      assert(length(nodes) == 1)
+      match elem_at(nodes, "database") {
+        Some(el) => {
+          match hml_body(el) {
+            Some(body) => {
+              assert(length(body) == 2)
+              match at(body, "host") |> as_str {
+                Some(v) => assert(v == "localhost"),
+                None => assert(false)
+              }
+            },
+            None => assert(false)
+          }
+        },
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "dotted keys in element body" {
+  let input = "@config \{\n    database.host: \"localhost\"\n    database.port: 5432\n\}"
+  match hml_parse(input) {
+    Ok(nodes) => {
+      match elem_at(nodes, "config") {
+        Some(el) => {
+          match hml_body(el) {
+            Some(body) => {
+              assert(length(body) == 1)
+              match elem_at(body, "database") {
+                Some(db) => {
+                  match hml_body(db) {
+                    Some(db_body) => assert(length(db_body) == 2),
+                    None => assert(false)
+                  }
+                },
+                None => assert(false)
+              }
+            },
+            None => assert(false)
+          }
+        },
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "deep dotted key" {
+  let input = "a.b.c: 42"
+  match hml_parse(input) {
+    Ok(nodes) => {
+      match elem_at(nodes, "a") {
+        Some(el) => {
+          match hml_body(el) {
+            Some(body) => {
+              match elem_at(body, "b") {
+                Some(inner) => {
+                  match hml_body(inner) {
+                    Some(inner_body) => {
+                      match at(inner_body, "c") |> as_int {
+                        Some(v) => assert(v == 42),
+                        None => assert(false)
+                      }
+                    },
+                    None => assert(false)
+                  }
+                },
+                None => assert(false)
+              }
+            },
+            None => assert(false)
+          }
+        },
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "dotted keys don't merge explicit elements" {
+  let input = "@server(port: 8080)\n@server(port: 9090)"
+  match hml_parse(input) {
+    Ok(nodes) => assert(length(nodes) == 2),
+    Err(_) => assert(false)
+  }
+}

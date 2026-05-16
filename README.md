@@ -4,8 +4,19 @@ An HML (Hica Markup Language) parser library written in [hica](https://github.co
 
 HML is a structured configuration and document language that combines the
 semantic strength of XML (elements with identity/metadata) with the readability
-of TOML/YAML. See [HML-Specification.md](HML-Specification.md) for the full spec.
+of TOML/YAML. See [HML-Specification](https://cladam.github.io/hica/docs/HML-specification/) for the full v0.3 spec.
 
+## Features
+
+- Full HML v0.3 compliance
+- Dotted keys with automatic merging (`database.host: "x"`)
+- Namespaced element names (`@k8s.deployment`)
+- `#include` directive with nested and circular detection
+- `#namespace` directive for URI bindings
+- `#text` directive for text content mode (mixed text + inline elements)
+- Merge rule validation (dotted keys vs explicit elements)
+- Date-time, duration, hex/octal/binary integer support
+- Pretty-printing and compact display
 
 ## Installation
 
@@ -17,13 +28,13 @@ git submodule add https://github.com/cladam/hml.git lib/hml
 
 Then import the library:
 
-```rust
-import "./lib/toml/src/hml"
+```hica
+import "./lib/hml/src/hml"
 ```
 
 ## Quick Example
 
-```rust
+```hml
 // config.hml
 @server(port: 8080, public) {
     host: "localhost"
@@ -38,7 +49,7 @@ import "./lib/toml/src/hml"
 }
 ```
 
-```rust
+```hica
 import "src/hml"
 
 fun main() {
@@ -73,6 +84,7 @@ fun main() {
 |----------|-----------|-------------|
 | `hml_parse` | `string -> result<list<HmlNode>, string>` | Parse an HML document |
 | `hml_parse_file` | `string -> result<list<HmlNode>, string>` | Parse a file with `#include` support |
+| `hml_parse_file_content` | `(string, string) -> result<list<HmlNode>, string>` | Parse content with a base path for includes |
 
 ### Element Access
 
@@ -94,7 +106,15 @@ fun main() {
 | `hml_bool(v)` | Extract boolean |
 | `hml_float(v)` | Extract float |
 | `hml_duration(v)` | Extract `(amount, unit)` tuple |
+| `hml_datetime(v)` | Extract datetime string |
 | `hml_list(v)` | Extract array items |
+
+### Namespace Access
+
+| Function | Description |
+|----------|-------------|
+| `hml_namespaces(nodes)` | Get all `(prefix, uri)` bindings |
+| `hml_namespace(nodes, prefix)` | Look up URI for a namespace prefix |
 
 ### Pipe-Friendly Helpers
 
@@ -105,6 +125,7 @@ fun main() {
 | `as_str(maybe_val)` | Pipe-friendly string extractor |
 | `as_int(maybe_val)` | Pipe-friendly int extractor |
 | `as_bool(maybe_val)` | Pipe-friendly bool extractor |
+| `as_datetime(maybe_val)` | Pipe-friendly datetime extractor |
 | `hml_ok(result)` | Convert `result` to `maybe` |
 
 ### Display
@@ -116,7 +137,7 @@ fun main() {
 
 ## Types
 
-```rust
+```hica
 type Hml {
   HStr(value: string),
   HInt(value: int),
@@ -133,7 +154,8 @@ type HmlNode {
   NProp(key: string, value: Hml),
   NElem(element: Hml),
   NText(content: string),
-  NComment(text: string)
+  NComment(text: string),
+  NNamespace(ns_prefix: string, uri: string)
 }
 ```
 
@@ -146,6 +168,7 @@ hica test tests/test_document.hc
 hica test tests/test_api.hc
 hica test tests/test_errors.hc
 hica test tests/test_include.hc
+hica test tests/test_text.hc
 ```
 
 ## Examples

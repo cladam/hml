@@ -102,6 +102,22 @@ pub fun hml_ok(r: result<list<HmlNode>, string>) : maybe<list<HmlNode>> => match
   Err(_) => None
 }
 
+pub fun hml_namespaces(nodes: list<HmlNode>) : list<(string, string)> {
+  match nodes {
+    [] => [],
+    [NNamespace(pfx, uri), ..rest] => [(pfx, uri)] + hml_namespaces(rest),
+    [_, ..rest] => hml_namespaces(rest)
+  }
+}
+
+pub fun hml_namespace(nodes: list<HmlNode>, pfx: string) : maybe<string> {
+  match nodes {
+    [] => None,
+    [NNamespace(p, uri), ..rest] => if p == pfx { Some(uri) } else { hml_namespace(rest, pfx) },
+    [_, ..rest] => hml_namespace(rest, pfx)
+  }
+}
+
 pub fun at(nodes: list<HmlNode>, key: string) : maybe<Hml> =>
   hml_get(nodes, key)
 

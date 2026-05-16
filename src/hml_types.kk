@@ -55,6 +55,7 @@ pub type hmlnode
   NElem(element : hml)
   NText(content : string)
   NComment(text : string)
+  NNamespace(ns_prefix : string, uri : string)
 
 pub fun hmlnode/show(v : hmlnode) : div string
   match v
@@ -62,6 +63,7 @@ pub fun hmlnode/show(v : hmlnode) : div string
     NElem(element) -> "NElem(" ++ hml/show(element) ++ ")"
     NText(content) -> "NText(" ++ content ++ ")"
     NComment(text) -> "NComment(" ++ text ++ ")"
+    NNamespace(ns_prefix, uri) -> "NNamespace(" ++ ns_prefix ++ ", " ++ uri ++ ")"
 
 struct cliflag
   flag_name : string

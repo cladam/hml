@@ -57,6 +57,7 @@ pub fun pretty_node(node: HmlNode, indent: int) : string {
     },
     NElem(_) => pad + "// unknown element",
     NText(content) => pad + content,
-    NComment(text) => pad + "// " + text
+    NComment(text) => pad + "// " + text,
+    NNamespace(pfx, uri) => pad + "#namespace " + pfx + ": \"" + uri + "\""
   }
 }

@@ -207,6 +207,47 @@ test "directive lines are skipped" {
   }
 }
 
+test "namespace directive parsed" {
+  let input = "#namespace k8s: \"https://kubernetes.io/schema/v1\"\n@k8s.pod"
+  match hml_parse(input) {
+    Ok(nodes) => {
+      assert(length(nodes) == 2)
+      match hml_namespace(nodes, "k8s") {
+        Some(uri) => assert(uri == "https://kubernetes.io/schema/v1"),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "multiple namespace directives" {
+  let input = "#namespace k8s: \"https://kubernetes.io/v1\"\n#namespace hica: \"https://hica.dev/v1\"\nname: \"app\""
+  match hml_parse(input) {
+    Ok(nodes) => {
+      assert(length(nodes) == 3)
+      let ns = hml_namespaces(nodes)
+      assert(length(ns) == 2)
+      match hml_namespace(nodes, "hica") {
+        Some(uri) => assert(uri == "https://hica.dev/v1"),
+        None => assert(false)
+      }
+    },
+    Err(_) => assert(false)
+  }
+}
+
+test "namespace with hml_namespaces" {
+  let input = "#namespace app: \"https://example.com\"\nversion: \"1.0\""
+  match hml_parse(input) {
+    Ok(nodes) => {
+      let ns = hml_namespaces(nodes)
+      assert(length(ns) == 1)
+    },
+    Err(_) => assert(false)
+  }
+}
+
 // ============================================================
 // Array values in body
 // ============================================================

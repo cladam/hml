@@ -927,3 +927,5 @@ pub fun hc_pretty_node(node : hmlnode, indent : int)
       (pad ++ content)
     NComment(text) ->
       ((pad ++ "// ") ++ text)
+    NNamespace(pfx, uri) ->
+      (((((pad ++ "#namespace ") ++ pfx) ++ ": \"") ++ uri) ++ "\"")

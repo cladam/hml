@@ -1501,8 +1501,12 @@ pub fun hc_parse_document(s : string, pos : int, nodes : list<hmlnode>)
       Left(e) ->
         Left(e)
   else if (hc_peek(s, p1) == "#") then
-    val p2 : int = hc_skip_to_eol(s, p1)
-    hc_parse_document(s, p2, nodes)
+    match hc_parse_namespace_directive(s, p1)
+      Just((pfx, uri, p2)) ->
+        hc_parse_document(s, p2, (nodes ++ [NNamespace(pfx, uri)]))
+      Nothing ->
+        val p2 = hc_skip_to_eol(s, p1)
+        hc_parse_document(s, p2, nodes)
   else
     match hc_parse_key_path(s, p1)
       Right((segments, p2)) ->
@@ -1520,23 +1524,23 @@ pub fun hc_parse_document(s : string, pos : int, nodes : list<hmlnode>)
       Left(_) ->
         Left(("unexpected content at position " ++ show(p1)))
 
-// .hc:740
+// .hc:744
 pub fun hc_hml_parse(input : string)
   hc_parse_document(input, 0, [])
 
-// .hc:750
+// .hc:754
 pub fun hc_find_last_slash(s : string, pos : int, last_end : int)
   if (pos >= s.count) then last_end else if (hc_peek(s, pos) == "/") then hc_find_last_slash(s, (pos + 1), (pos + 1)) else hc_find_last_slash(s, (pos + 1), last_end)
 
-// .hc:755
+// .hc:759
 pub fun hc_dir_of_path(hc_path : string)
   hc_path.list.drop(0).take((hc_find_last_slash(hc_path, 0, 0)) - (0)).string
 
-// .hc:756
+// .hc:760
 pub fun hc_resolve_include_path(base_dir : string, rel : string) : string
   (base_dir ++ rel)
 
-// .hc:760
+// .hc:766
 pub fun hc_list_contains(items : list<string>, target : string)
   match items
     Nil ->
@@ -1544,7 +1548,7 @@ pub fun hc_list_contains(items : list<string>, target : string)
     Cons(x, rest) ->
       if (x == target) then True else hc_list_contains(rest, target)
 
-// .hc:767
+// .hc:771
 pub fun hc_parse_include_path(s : string, pos : int)
   if !(hc_starts_with_at(s, pos, "#include")) then
     Nothing
@@ -1559,7 +1563,31 @@ pub fun hc_parse_include_path(s : string, pos : int)
     else
       Nothing
 
-// .hc:779
+// .hc:783
+pub fun hc_parse_namespace_directive(s : string, pos : int)
+  if !(hc_starts_with_at(s, pos, "#namespace")) then
+    Nothing
+  else
+    val p1 : int = hc_skip_ws(s, (pos + 10))
+    match hc_parse_bare_key(s, p1, "")
+      Right((pfx, p2)) ->
+        val p3 = hc_skip_ws(s, p2)
+        if (hc_peek(s, p3) == ":") then
+          val p4 : int = hc_skip_ws(s, (p3 + 1))
+          if (hc_peek(s, p4) == "\"") then
+            match hc_parse_basic_string(s, (p4 + 1), "")
+              Right((uri, p5)) ->
+                Just((pfx, uri, p5))
+              Left(_) ->
+                Nothing
+          else
+            Nothing
+        else
+          Nothing
+      Left(_) ->
+        Nothing
+
+// .hc:807
 pub fun hc_include_file_nodes(s : string, p2 : int, content : string, full_path : string, nodes : list<hmlnode>, base_dir : string, seen : list<string>)
   val inc_base : string = hc_dir_of_path(full_path)
   match hc_parse_file_doc(content, 0, [], inc_base, (seen ++ [full_path]))
@@ -1568,7 +1596,7 @@ pub fun hc_include_file_nodes(s : string, p2 : int, content : string, full_path 
     Left(e) ->
       Left(e)
 
-// .hc:790
+// .hc:819
 pub fun hc_parse_file_doc(s : string, pos : int, nodes : list<hmlnode>, base_dir : string, seen : list<string>)
   val p1 : int = hc_skip_noise(s, pos)
   if (p1 >= s.count) then
@@ -1592,7 +1620,11 @@ pub fun hc_parse_file_doc(s : string, pos : int, nodes : list<hmlnode>, base_dir
             Left(_) ->
               Left(("cannot read included file: " ++ full_path))
       Nothing ->
-        hc_parse_file_doc(s, hc_skip_to_eol(s, p1), nodes, base_dir, seen)
+        match hc_parse_namespace_directive(s, p1)
+          Just((pfx, uri, p2)) ->
+            hc_parse_file_doc(s, p2, (nodes ++ [NNamespace(pfx, uri)]), base_dir, seen)
+          Nothing ->
+            hc_parse_file_doc(s, hc_skip_to_eol(s, p1), nodes, base_dir, seen)
   else
     match hc_parse_key_path(s, p1)
       Right((segments, p2)) ->
@@ -1610,12 +1642,12 @@ pub fun hc_parse_file_doc(s : string, pos : int, nodes : list<hmlnode>, base_dir
       Left(_) ->
         Left(("unexpected content at position " ++ show(p1)))
 
-// .hc:834
+// .hc:868
 pub fun hc_hml_parse_file_content(content : string, hc_path : string)
   val base : string = hc_dir_of_path(hc_path)
   hc_parse_file_doc(content, 0, [], base, [hc_path])
 
-// .hc:841
+// .hc:875
 pub fun hc_hml_parse_file(hc_path : string)
   match (match try({ read-text-file(hc_path.path) }) { Ok(hc__c) -> Right(hc__c); Error(hc__e) -> Left(hc__e.message) })
     Right(content) ->

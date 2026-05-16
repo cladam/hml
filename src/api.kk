@@ -989,14 +989,34 @@ pub fun hc_hml_ok(r : either<string, list<hmlnode>>) : maybe<list<hmlnode>>
       Nothing
 
 // .hc:102
+pub fun hc_hml_namespaces(nodes : list<hmlnode>)
+  match nodes
+    Nil ->
+      []
+    Cons(NNamespace(pfx, uri), rest) ->
+      ([(pfx, uri)] ++ hc_hml_namespaces(rest))
+    Cons(_, rest) ->
+      hc_hml_namespaces(rest)
+
+// .hc:109
+pub fun hc_hml_namespace(nodes : list<hmlnode>, pfx : string)
+  match nodes
+    Nil ->
+      Nothing
+    Cons(NNamespace(p, uri), rest) ->
+      if (p == pfx) then Just(uri) else hc_hml_namespace(rest, pfx)
+    Cons(_, rest) ->
+      hc_hml_namespace(rest, pfx)
+
+// .hc:117
 pub fun hc_at(nodes : list<hmlnode>, key : string)
   hc_hml_get(nodes, key)
 
-// .hc:106
+// .hc:122
 pub fun hc_elem_at(nodes : list<hmlnode>, name : string)
   hc_hml_elem(nodes, name)
 
-// .hc:109
+// .hc:125
 pub fun hc_as_str(v : maybe<hml>) : maybe<string>
   match v
     Just(h) ->
@@ -1004,7 +1024,7 @@ pub fun hc_as_str(v : maybe<hml>) : maybe<string>
     Nothing ->
       Nothing
 
-// .hc:113
+// .hc:129
 pub fun hc_as_int(v : maybe<hml>) : maybe<int>
   match v
     Just(h) ->
@@ -1012,7 +1032,7 @@ pub fun hc_as_int(v : maybe<hml>) : maybe<int>
     Nothing ->
       Nothing
 
-// .hc:118
+// .hc:134
 pub fun hc_as_bool(v : maybe<hml>) : maybe<bool>
   match v
     Just(h) ->
@@ -1020,7 +1040,7 @@ pub fun hc_as_bool(v : maybe<hml>) : maybe<bool>
     Nothing ->
       Nothing
 
-// .hc:123
+// .hc:139
 pub fun hc_as_datetime(v : maybe<hml>) : maybe<string>
   match v
     Just(h) ->

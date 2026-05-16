@@ -16,5 +16,6 @@ pub type HmlNode {
   NProp(key: string, value: Hml),
   NElem(element: Hml),
   NText(content: string),
-  NComment(text: string)
+  NComment(text: string),
+  NNamespace(ns_prefix: string, uri: string)
 }

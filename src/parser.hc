@@ -717,9 +717,13 @@ pub fun parse_document(s: string, pos: int, nodes: list<HmlNode>) : result<list<
     }
   }
   else if peek(s, p1) == "#" {
-    // Skip directives for now (consume to end of line)
-    let p2 = skip_to_eol(s, p1)
-    parse_document(s, p2, nodes)
+    match parse_namespace_directive(s, p1) {
+      Some((pfx, uri, p2)) => parse_document(s, p2, nodes + [NNamespace(pfx, uri)]),
+      None => {
+        let p2 = skip_to_eol(s, p1)
+        parse_document(s, p2, nodes)
+      }
+    }
   }
   else {
     match parse_key_path(s, p1) {
@@ -784,6 +788,31 @@ pub fun parse_include_path(s: string, pos: int) : maybe<(string, int)> {
   }
 }
 
+pub fun parse_namespace_directive(s: string, pos: int) : maybe<(string, string, int)> {
+  // pos is at '#'. Check for #namespace prefix: "uri"
+  if !starts_with_at(s, pos, "#namespace") { None }
+  else {
+    let p1 = skip_ws(s, pos + 10)
+    match parse_bare_key(s, p1, "") {
+      Ok((pfx, p2)) => {
+        let p3 = skip_ws(s, p2)
+        if peek(s, p3) == ":" {
+          let p4 = skip_ws(s, p3 + 1)
+          if peek(s, p4) == "\"" {
+            match parse_basic_string(s, p4 + 1, "") {
+              Ok((uri, p5)) => Some((pfx, uri, p5)),
+              Err(_) => None
+            }
+          }
+          else { None }
+        }
+        else { None }
+      },
+      Err(_) => None
+    }
+  }
+}
+
 pub fun include_file_nodes(s: string, p2: int, content: string, full_path: string, nodes: list<HmlNode>, base_dir: string, seen: list<string>) : result<list<HmlNode>, string> {
   let inc_base = dir_of_path(full_path)
   match parse_file_doc(content, 0, [], inc_base, seen + [full_path]) {
@@ -813,7 +842,12 @@ pub fun parse_file_doc(s: string, pos: int, nodes: list<HmlNode>, base_dir: stri
           }
         }
       },
-      None => parse_file_doc(s, skip_to_eol(s, p1), nodes, base_dir, seen)
+      None => {
+        match parse_namespace_directive(s, p1) {
+          Some((pfx, uri, p2)) => parse_file_doc(s, p2, nodes + [NNamespace(pfx, uri)], base_dir, seen),
+          None => parse_file_doc(s, skip_to_eol(s, p1), nodes, base_dir, seen)
+        }
+      }
     }
   }
   else {

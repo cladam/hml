@@ -1390,6 +1390,34 @@ pub fun hc_is_elem_named(node : hmlnode, name : string) : bool
       False
 
 // .hc:598
+pub fun hc_has_elem_named(nodes : list<hmlnode>, name : string)
+  match nodes
+    Nil ->
+      False
+    Cons(first, rest) ->
+      if hc_is_elem_named(first, name) then True else hc_has_elem_named(rest, name)
+
+// .hc:607
+pub fun hc_add_if_missing(items : list<string>, item : string)
+  if hc_list_contains(items, item) then items else (items ++ [item])
+
+// .hc:611
+pub fun hc_first_segment(segments : list<string>) : string
+  match segments
+    Cons(s, _) ->
+      s
+    _ ->
+      ""
+
+// .hc:614
+pub fun hc_hml_elem_name(v : hml) : string
+  match v
+    HElement(n, _, _) ->
+      n
+    _ ->
+      ""
+
+// .hc:621
 pub fun hc_merge_two_elems(existing : hmlnode, new_body : list<hmlnode>)
   match existing
     NElem(HElement(n, a, b)) ->
@@ -1397,7 +1425,7 @@ pub fun hc_merge_two_elems(existing : hmlnode, new_body : list<hmlnode>)
     _ ->
       existing
 
-// .hc:606
+// .hc:630
 pub fun hc_try_merge_elem(nodes : list<hmlnode>, name : string, attrs : list<(string, hml)>, body : list<hmlnode>, checked : list<hmlnode>)
   match nodes
     Nil ->
@@ -1405,7 +1433,7 @@ pub fun hc_try_merge_elem(nodes : list<hmlnode>, name : string, attrs : list<(st
     Cons(first, rest) ->
       if hc_is_elem_named(first, name) then ((checked ++ [hc_merge_two_elems(first, body)]) ++ rest) else hc_try_merge_elem(rest, name, attrs, body, (checked ++ [first]))
 
-// .hc:618
+// .hc:642
 pub fun hc_insert_or_merge(acc : list<hmlnode>, node : hmlnode)
   match node
     NElem(HElement(name, attrs, body)) ->
@@ -1413,7 +1441,7 @@ pub fun hc_insert_or_merge(acc : list<hmlnode>, node : hmlnode)
     _ ->
       (acc ++ [node])
 
-// .hc:625
+// .hc:649
 pub fun hc_merge_body_acc(remaining : list<hmlnode>, acc : list<hmlnode>)
   match remaining
     Nil ->
@@ -1421,19 +1449,23 @@ pub fun hc_merge_body_acc(remaining : list<hmlnode>, acc : list<hmlnode>)
     Cons(node, rest) ->
       hc_merge_body_acc(rest, hc_insert_or_merge(acc, node))
 
-// .hc:633
+// .hc:657
 pub fun hc_merge_body(nodes : list<hmlnode>)
   hc_merge_body_acc(nodes, [])
 
-// .hc:637
-pub fun hc_parse_body(s : string, pos : int, nodes : list<hmlnode>, text_elems : list<string>)
+// .hc:661
+pub fun hc_parse_body(s : string, pos : int, nodes : list<hmlnode>, text_elems : list<string>, dotted_names : list<string>)
   val p1 : int = hc_skip_noise(s, pos)
   if (hc_peek(s, p1) == "}") then
     Right((nodes, (p1 + 1)))
   else if (hc_peek(s, p1) == "@") then
     match hc_parse_element(s, p1, text_elems)
       Right((elem, p2)) ->
-        hc_parse_body(s, p2, (nodes ++ [NElem(elem)]), text_elems)
+        val ename = hc_hml_elem_name(elem)
+        if hc_list_contains(dotted_names, ename) then
+          Left((((("merge rule: cannot mix explicit @" ++ ename) ++ " with dotted key '") ++ ename) ++ ".*'"))
+        else
+          hc_parse_body(s, p2, (nodes ++ [NElem(elem)]), text_elems, dotted_names)
       Left(e) ->
         Left(e)
   else if (hc_peek(s, p1) == "") then
@@ -1447,7 +1479,13 @@ pub fun hc_parse_body(s : string, pos : int, nodes : list<hmlnode>, text_elems :
           match hc_parse_value(s, p4, text_elems)
             Right((hc_val, p5)) ->
               val new_node = hc_wrap_dotted_value(segments, hc_val)
-              if (list/length(segments) > 1) then hc_parse_body(s, p5, hc_insert_or_merge(nodes, new_node), text_elems) else hc_parse_body(s, p5, (nodes ++ [new_node]), text_elems)
+              val root = hc_first_segment(segments)
+              if (((list/length(segments) > 1) && hc_has_elem_named(nodes, root)) && !(hc_list_contains(dotted_names, root))) then
+                Left(((("merge rule: cannot mix dotted key '" ++ root) ++ ".*' with explicit @") ++ root))
+              else if (list/length(segments) > 1) then
+                hc_parse_body(s, p5, hc_insert_or_merge(nodes, new_node), text_elems, hc_add_if_missing(dotted_names, root))
+              else
+                hc_parse_body(s, p5, (nodes ++ [new_node]), text_elems, dotted_names)
             Left(e) ->
               Left(e)
         else
@@ -1455,7 +1493,7 @@ pub fun hc_parse_body(s : string, pos : int, nodes : list<hmlnode>, text_elems :
       Left(_) ->
         Left(("unexpected content in body at position " ++ show(p1)))
 
-// .hc:667
+// .hc:701
 pub fun hc_is_text_elem(name : string, text_elems : list<string>)
   match text_elems
     Nil ->
@@ -1463,7 +1501,7 @@ pub fun hc_is_text_elem(name : string, text_elems : list<string>)
     Cons(x, rest) ->
       if (x == name) then True else hc_is_text_elem(name, rest)
 
-// .hc:675
+// .hc:709
 pub fun hc_collect_text_run(s : string, pos : int, acc : string, text_elems : list<string>)
   if (pos >= s.count) then
     (if (acc == "") then [] else [NText(acc)], pos)
@@ -1482,7 +1520,7 @@ pub fun hc_collect_text_run(s : string, pos : int, acc : string, text_elems : li
   else
     hc_collect_text_run(s, (pos + 1), (acc ++ hc_peek(s, pos)), text_elems)
 
-// .hc:693
+// .hc:727
 pub fun hc_try_inline_element(s : string, pos : int, text_elems : list<string>)
   val p1 : int = (pos + 1)
   match hc_parse_element_name(s, p1, "")
@@ -1511,7 +1549,7 @@ pub fun hc_try_inline_element(s : string, pos : int, text_elems : list<string>)
     Left(_) ->
       Nothing
 
-// .hc:721
+// .hc:755
 pub fun hc_try_text_property(s : string, pos : int, text_elems : list<string>)
   match hc_parse_bare_key(s, pos, "")
     Right((key, p2)) ->
@@ -1528,7 +1566,7 @@ pub fun hc_try_text_property(s : string, pos : int, text_elems : list<string>)
     Left(_) ->
       Nothing
 
-// .hc:735
+// .hc:769
 pub fun hc_parse_text_body(s : string, pos : int, nodes : list<hmlnode>, text_elems : list<string>)
   val p1 : int = hc_skip_ws(s, pos)
   if (p1 >= s.count) then
@@ -1554,7 +1592,7 @@ pub fun hc_parse_text_body(s : string, pos : int, nodes : list<hmlnode>, text_el
         val (text_nodes, p2) = hc_collect_text_run(s, p1, "", text_elems)
         hc_parse_text_body(s, p2, (nodes ++ text_nodes), text_elems)
 
-// .hc:764
+// .hc:798
 pub fun hc_parse_element(s : string, pos : int, text_elems : list<string>)
   val p1 : int = (pos + 1)
   match hc_parse_element_name(s, p1, "")
@@ -1579,7 +1617,7 @@ pub fun hc_parse_element(s : string, pos : int, text_elems : list<string>)
                 Left(e) ->
                   Left(e)
             else
-              match hc_parse_body(s, (p5 + 1), [], text_elems)
+              match hc_parse_body(s, (p5 + 1), [], text_elems, [])
                 Right((body, p6)) ->
                   Right((HElement(name, attrs, body), p6))
                 Left(e) ->
@@ -1591,11 +1629,11 @@ pub fun hc_parse_element(s : string, pos : int, text_elems : list<string>)
     Left(e) ->
       Left(e)
 
-// .hc:800
+// .hc:834
 pub fun hc_parse_inline_element(s : string, pos : int, text_elems : list<string>)
   hc_parse_element(s, pos, text_elems)
 
-// .hc:809
+// .hc:843
 pub fun hc_parse_text_names(s : string, pos : int, names : list<string>)
   val p1 : int = hc_skip_ws(s, pos)
   if ((p1 >= s.count) || hc_is_newline(hc_peek(s, p1))) then
@@ -1609,7 +1647,7 @@ pub fun hc_parse_text_names(s : string, pos : int, names : list<string>)
       Left(_) ->
         (names, p1)
 
-// .hc:818
+// .hc:852
 pub fun hc_parse_text_directive(s : string, pos : int)
   if !(hc_starts_with_at(s, pos, "#text")) then
     Nothing
@@ -1621,32 +1659,36 @@ pub fun hc_parse_text_directive(s : string, pos : int)
     else
       Nothing
 
-// .hc:837
+// .hc:871
 pub fun hc_default_text_elems() : list<string>
   ["body", "p", "text"]
 
-// .hc:839
-pub fun hc_parse_document(s : string, pos : int, nodes : list<hmlnode>, text_elems : list<string>)
+// .hc:873
+pub fun hc_parse_document(s : string, pos : int, nodes : list<hmlnode>, text_elems : list<string>, dotted_names : list<string>)
   val p1 : int = hc_skip_noise(s, pos)
   if (p1 >= s.count) then
     Right(nodes)
   else if (hc_peek(s, p1) == "@") then
     match hc_parse_element(s, p1, text_elems)
       Right((elem, p2)) ->
-        hc_parse_document(s, p2, (nodes ++ [NElem(elem)]), text_elems)
+        val ename = hc_hml_elem_name(elem)
+        if hc_list_contains(dotted_names, ename) then
+          Left((((("merge rule: cannot mix explicit @" ++ ename) ++ " with dotted key '") ++ ename) ++ ".*'"))
+        else
+          hc_parse_document(s, p2, (nodes ++ [NElem(elem)]), text_elems, dotted_names)
       Left(e) ->
         Left(e)
   else if (hc_peek(s, p1) == "#") then
     match hc_parse_namespace_directive(s, p1)
       Just((pfx, uri, p2)) ->
-        hc_parse_document(s, p2, (nodes ++ [NNamespace(pfx, uri)]), text_elems)
+        hc_parse_document(s, p2, (nodes ++ [NNamespace(pfx, uri)]), text_elems, dotted_names)
       Nothing ->
         match hc_parse_text_directive(s, p1)
           Just((names, p2)) ->
-            hc_parse_document(s, p2, nodes, (text_elems ++ names))
+            hc_parse_document(s, p2, nodes, (text_elems ++ names), dotted_names)
           Nothing ->
             val p2 = hc_skip_to_eol(s, p1)
-            hc_parse_document(s, p2, nodes, text_elems)
+            hc_parse_document(s, p2, nodes, text_elems, dotted_names)
   else
     match hc_parse_key_path(s, p1)
       Right((segments, p2)) ->
@@ -1656,7 +1698,13 @@ pub fun hc_parse_document(s : string, pos : int, nodes : list<hmlnode>, text_ele
           match hc_parse_value(s, p4, text_elems)
             Right((hc_val, p5)) ->
               val new_node = hc_wrap_dotted_value(segments, hc_val)
-              if (list/length(segments) > 1) then hc_parse_document(s, p5, hc_insert_or_merge(nodes, new_node), text_elems) else hc_parse_document(s, p5, (nodes ++ [new_node]), text_elems)
+              val root = hc_first_segment(segments)
+              if (((list/length(segments) > 1) && hc_has_elem_named(nodes, root)) && !(hc_list_contains(dotted_names, root))) then
+                Left(((("merge rule: cannot mix dotted key '" ++ root) ++ ".*' with explicit @") ++ root))
+              else if (list/length(segments) > 1) then
+                hc_parse_document(s, p5, hc_insert_or_merge(nodes, new_node), text_elems, hc_add_if_missing(dotted_names, root))
+              else
+                hc_parse_document(s, p5, (nodes ++ [new_node]), text_elems, dotted_names)
             Left(e) ->
               Left(e)
         else
@@ -1664,23 +1712,23 @@ pub fun hc_parse_document(s : string, pos : int, nodes : list<hmlnode>, text_ele
       Left(_) ->
         Left(("unexpected content at position " ++ show(p1)))
 
-// .hc:882
+// .hc:926
 pub fun hc_hml_parse(input : string)
-  hc_parse_document(input, 0, [], hc_default_text_elems())
+  hc_parse_document(input, 0, [], hc_default_text_elems(), [])
 
-// .hc:892
+// .hc:936
 pub fun hc_find_last_slash(s : string, pos : int, last_end : int)
   if (pos >= s.count) then last_end else if (hc_peek(s, pos) == "/") then hc_find_last_slash(s, (pos + 1), (pos + 1)) else hc_find_last_slash(s, (pos + 1), last_end)
 
-// .hc:897
+// .hc:941
 pub fun hc_dir_of_path(hc_path : string)
   hc_path.list.drop(0).take((hc_find_last_slash(hc_path, 0, 0)) - (0)).string
 
-// .hc:898
+// .hc:942
 pub fun hc_resolve_include_path(base_dir : string, rel : string) : string
   (base_dir ++ rel)
 
-// .hc:902
+// .hc:946
 pub fun hc_list_contains(items : list<string>, target : string)
   match items
     Nil ->
@@ -1688,7 +1736,7 @@ pub fun hc_list_contains(items : list<string>, target : string)
     Cons(x, rest) ->
       if (x == target) then True else hc_list_contains(rest, target)
 
-// .hc:909
+// .hc:953
 pub fun hc_parse_include_path(s : string, pos : int)
   if !(hc_starts_with_at(s, pos, "#include")) then
     Nothing
@@ -1703,7 +1751,7 @@ pub fun hc_parse_include_path(s : string, pos : int)
     else
       Nothing
 
-// .hc:921
+// .hc:965
 pub fun hc_parse_namespace_directive(s : string, pos : int)
   if !(hc_starts_with_at(s, pos, "#namespace")) then
     Nothing
@@ -1727,24 +1775,28 @@ pub fun hc_parse_namespace_directive(s : string, pos : int)
       Left(_) ->
         Nothing
 
-// .hc:945
-pub fun hc_include_file_nodes(s : string, p2 : int, content : string, full_path : string, nodes : list<hmlnode>, base_dir : string, seen : list<string>, text_elems : list<string>)
+// .hc:989
+pub fun hc_include_file_nodes(s : string, p2 : int, content : string, full_path : string, nodes : list<hmlnode>, base_dir : string, seen : list<string>, text_elems : list<string>, dotted_names : list<string>)
   val inc_base : string = hc_dir_of_path(full_path)
-  match hc_parse_file_doc(content, 0, [], inc_base, (seen ++ [full_path]), text_elems)
+  match hc_parse_file_doc(content, 0, [], inc_base, (seen ++ [full_path]), text_elems, [])
     Right(inc_nodes) ->
-      hc_parse_file_doc(s, hc_skip_to_eol(s, p2), (nodes ++ inc_nodes), base_dir, seen, text_elems)
+      hc_parse_file_doc(s, hc_skip_to_eol(s, p2), (nodes ++ inc_nodes), base_dir, seen, text_elems, dotted_names)
     Left(e) ->
       Left(e)
 
-// .hc:957
-pub fun hc_parse_file_doc(s : string, pos : int, nodes : list<hmlnode>, base_dir : string, seen : list<string>, text_elems : list<string>)
+// .hc:1001
+pub fun hc_parse_file_doc(s : string, pos : int, nodes : list<hmlnode>, base_dir : string, seen : list<string>, text_elems : list<string>, dotted_names : list<string>)
   val p1 : int = hc_skip_noise(s, pos)
   if (p1 >= s.count) then
     Right(nodes)
   else if (hc_peek(s, p1) == "@") then
     match hc_parse_element(s, p1, text_elems)
       Right((elem, p2)) ->
-        hc_parse_file_doc(s, p2, (nodes ++ [NElem(elem)]), base_dir, seen, text_elems)
+        val ename = hc_hml_elem_name(elem)
+        if hc_list_contains(dotted_names, ename) then
+          Left((((("merge rule: cannot mix explicit @" ++ ename) ++ " with dotted key '") ++ ename) ++ ".*'"))
+        else
+          hc_parse_file_doc(s, p2, (nodes ++ [NElem(elem)]), base_dir, seen, text_elems, dotted_names)
       Left(e) ->
         Left(e)
   else if (hc_peek(s, p1) == "#") then
@@ -1756,19 +1808,19 @@ pub fun hc_parse_file_doc(s : string, pos : int, nodes : list<hmlnode>, base_dir
         else
           match (match try({ read-text-file(full_path.path) }) { Ok(hc__c) -> Right(hc__c); Error(hc__e) -> Left(hc__e.message) })
             Right(content) ->
-              hc_include_file_nodes(s, p2, content, full_path, nodes, base_dir, seen, text_elems)
+              hc_include_file_nodes(s, p2, content, full_path, nodes, base_dir, seen, text_elems, dotted_names)
             Left(_) ->
               Left(("cannot read included file: " ++ full_path))
       Nothing ->
         match hc_parse_namespace_directive(s, p1)
           Just((pfx, uri, p2)) ->
-            hc_parse_file_doc(s, p2, (nodes ++ [NNamespace(pfx, uri)]), base_dir, seen, text_elems)
+            hc_parse_file_doc(s, p2, (nodes ++ [NNamespace(pfx, uri)]), base_dir, seen, text_elems, dotted_names)
           Nothing ->
             match hc_parse_text_directive(s, p1)
               Just((names, p2)) ->
-                hc_parse_file_doc(s, p2, nodes, base_dir, seen, (text_elems ++ names))
+                hc_parse_file_doc(s, p2, nodes, base_dir, seen, (text_elems ++ names), dotted_names)
               Nothing ->
-                hc_parse_file_doc(s, hc_skip_to_eol(s, p1), nodes, base_dir, seen, text_elems)
+                hc_parse_file_doc(s, hc_skip_to_eol(s, p1), nodes, base_dir, seen, text_elems, dotted_names)
   else
     match hc_parse_key_path(s, p1)
       Right((segments, p2)) ->
@@ -1778,10 +1830,13 @@ pub fun hc_parse_file_doc(s : string, pos : int, nodes : list<hmlnode>, base_dir
           match hc_parse_value(s, p4, text_elems)
             Right((hc_val, p5)) ->
               val new_node = hc_wrap_dotted_value(segments, hc_val)
-              if (list/length(segments) > 1) then
-                hc_parse_file_doc(s, p5, hc_insert_or_merge(nodes, new_node), base_dir, seen, text_elems)
+              val root = hc_first_segment(segments)
+              if (((list/length(segments) > 1) && hc_has_elem_named(nodes, root)) && !(hc_list_contains(dotted_names, root))) then
+                Left(((("merge rule: cannot mix dotted key '" ++ root) ++ ".*' with explicit @") ++ root))
+              else if (list/length(segments) > 1) then
+                hc_parse_file_doc(s, p5, hc_insert_or_merge(nodes, new_node), base_dir, seen, text_elems, hc_add_if_missing(dotted_names, root))
               else
-                hc_parse_file_doc(s, p5, (nodes ++ [new_node]), base_dir, seen, text_elems)
+                hc_parse_file_doc(s, p5, (nodes ++ [new_node]), base_dir, seen, text_elems, dotted_names)
             Left(e) ->
               Left(e)
         else
@@ -1789,12 +1844,12 @@ pub fun hc_parse_file_doc(s : string, pos : int, nodes : list<hmlnode>, base_dir
       Left(_) ->
         Left(("unexpected content at position " ++ show(p1)))
 
-// .hc:1011
+// .hc:1065
 pub fun hc_hml_parse_file_content(content : string, hc_path : string)
   val base : string = hc_dir_of_path(hc_path)
-  hc_parse_file_doc(content, 0, [], base, [hc_path], hc_default_text_elems())
+  hc_parse_file_doc(content, 0, [], base, [hc_path], hc_default_text_elems(), [])
 
-// .hc:1019
+// .hc:1073
 pub fun hc_hml_parse_file(hc_path : string)
   match (match try({ read-text-file(hc_path.path) }) { Ok(hc__c) -> Right(hc__c); Error(hc__e) -> Left(hc__e.message) })
     Right(content) ->

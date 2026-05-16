@@ -123,3 +123,47 @@ test "missing value after colon in body" {
     Ok(_) => assert(false)
   }
 }
+
+// ============================================================
+// Merge rule: dotted keys vs explicit elements
+// ============================================================
+
+test "merge rule: dotted key then explicit element in body" {
+  let input = "@config \{\n    database.host: \"localhost\"\n    @database \{\n        port: 5432\n    \}\n\}"
+  match hml_parse(input) {
+    Err(e) => assert(contains(e, "merge rule")),
+    Ok(_) => assert(false)
+  }
+}
+
+test "merge rule: explicit element then dotted key in body" {
+  let input = "@config \{\n    @database \{\n        port: 5432\n    \}\n    database.host: \"localhost\"\n\}"
+  match hml_parse(input) {
+    Err(e) => assert(contains(e, "merge rule")),
+    Ok(_) => assert(false)
+  }
+}
+
+test "merge rule: dotted key then explicit element at document level" {
+  let input = "database.host: \"localhost\"\n@database \{\n    port: 5432\n\}"
+  match hml_parse(input) {
+    Err(e) => assert(contains(e, "merge rule")),
+    Ok(_) => assert(false)
+  }
+}
+
+test "merge rule: multiple dotted keys same root is valid" {
+  let input = "@config \{\n    database.host: \"localhost\"\n    database.port: 5432\n\}"
+  match hml_parse(input) {
+    Ok(nodes) => assert(length(nodes) == 1),
+    Err(_) => assert(false)
+  }
+}
+
+test "merge rule: repeated explicit elements is valid" {
+  let input = "@cluster \{\n    @node(id: \"n1\")\n    @node(id: \"n2\")\n\}"
+  match hml_parse(input) {
+    Ok(nodes) => assert(length(nodes) == 1),
+    Err(_) => assert(false)
+  }
+}

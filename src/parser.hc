@@ -601,6 +601,30 @@ pub fun is_elem_named(node: HmlNode, name: string) : bool {
   }
 }
 
+pub fun has_elem_named(nodes: list<HmlNode>, name: string) : bool {
+  match nodes {
+    [] => false,
+    [first, ..rest] => if is_elem_named(first, name) { true } else { has_elem_named(rest, name) }
+  }
+}
+
+pub fun add_if_missing(items: list<string>, item: string) : list<string> =>
+  if list_contains(items, item) { items } else { items + [item] }
+
+pub fun first_segment(segments: list<string>) : string {
+  match segments {
+    [s, ..] => s,
+    _ => ""
+  }
+}
+
+pub fun hml_elem_name(v: Hml) : string {
+  match v {
+    HElement(n, _, _) => n,
+    _ => ""
+  }
+}
+
 pub fun merge_two_elems(existing: HmlNode, new_body: list<HmlNode>) : HmlNode {
   match existing {
     NElem(HElement(n, a, b)) => NElem(HElement(n, a, merge_body(b + new_body))),
@@ -637,12 +661,18 @@ pub fun merge_body_acc(remaining: list<HmlNode>, acc: list<HmlNode>) : list<HmlN
 pub fun merge_body(nodes: list<HmlNode>) : list<HmlNode> =>
   merge_body_acc(nodes, [])
 
-pub fun parse_body(s: string, pos: int, nodes: list<HmlNode>, text_elems: list<string>) : result<(list<HmlNode>, int), string> {
+pub fun parse_body(s: string, pos: int, nodes: list<HmlNode>, text_elems: list<string>, dotted_names: list<string>) : result<(list<HmlNode>, int), string> {
   let p1 = skip_noise(s, pos)
   if peek(s, p1) == "}" { Ok((nodes, p1 + 1)) }
   else if peek(s, p1) == "@" {
     match parse_element(s, p1, text_elems) {
-      Ok((elem, p2)) => parse_body(s, p2, nodes + [NElem(elem)], text_elems),
+      Ok((elem, p2)) => {
+        let ename = hml_elem_name(elem)
+        if list_contains(dotted_names, ename) {
+          Err("merge rule: cannot mix explicit @" + ename + " with dotted key '" + ename + ".*'")
+        }
+        else { parse_body(s, p2, nodes + [NElem(elem)], text_elems, dotted_names) }
+      },
       Err(e) => Err(e)
     }
   }
@@ -656,8 +686,12 @@ pub fun parse_body(s: string, pos: int, nodes: list<HmlNode>, text_elems: list<s
           match parse_value(s, p4, text_elems) {
             Ok((val, p5)) => {
               let new_node = wrap_dotted_value(segments, val)
-              if length(segments) > 1 { parse_body(s, p5, insert_or_merge(nodes, new_node), text_elems) }
-              else { parse_body(s, p5, nodes + [new_node], text_elems) }
+              let root = first_segment(segments)
+              if length(segments) > 1 && has_elem_named(nodes, root) && !list_contains(dotted_names, root) {
+                Err("merge rule: cannot mix dotted key '" + root + ".*' with explicit @" + root)
+              }
+              else if length(segments) > 1 { parse_body(s, p5, insert_or_merge(nodes, new_node), text_elems, add_if_missing(dotted_names, root)) }
+              else { parse_body(s, p5, nodes + [new_node], text_elems, dotted_names) }
             },
             Err(e) => Err(e)
           }
@@ -791,7 +825,7 @@ pub fun parse_element(s: string, pos: int, text_elems: list<string>) : result<(H
               }
             }
             else {
-              match parse_body(s, p5 + 1, [], text_elems) {
+              match parse_body(s, p5 + 1, [], text_elems, []) {
                 Ok((body, p6)) => Ok((HElement(name, attrs, body), p6)),
                 Err(e) => Err(e)
               }
@@ -840,24 +874,30 @@ pub fun parse_text_directive(s: string, pos: int) : maybe<(list<string>, int)> {
 
 pub fun default_text_elems() : list<string> => ["body", "p", "text"]
 
-pub fun parse_document(s: string, pos: int, nodes: list<HmlNode>, text_elems: list<string>) : result<list<HmlNode>, string> {
+pub fun parse_document(s: string, pos: int, nodes: list<HmlNode>, text_elems: list<string>, dotted_names: list<string>) : result<list<HmlNode>, string> {
   let p1 = skip_noise(s, pos)
   if p1 >= str_length(s) { Ok(nodes) }
   else if peek(s, p1) == "@" {
     match parse_element(s, p1, text_elems) {
-      Ok((elem, p2)) => parse_document(s, p2, nodes + [NElem(elem)], text_elems),
+      Ok((elem, p2)) => {
+        let ename = hml_elem_name(elem)
+        if list_contains(dotted_names, ename) {
+          Err("merge rule: cannot mix explicit @" + ename + " with dotted key '" + ename + ".*'")
+        }
+        else { parse_document(s, p2, nodes + [NElem(elem)], text_elems, dotted_names) }
+      },
       Err(e) => Err(e)
     }
   }
   else if peek(s, p1) == "#" {
     match parse_namespace_directive(s, p1) {
-      Some((pfx, uri, p2)) => parse_document(s, p2, nodes + [NNamespace(pfx, uri)], text_elems),
+      Some((pfx, uri, p2)) => parse_document(s, p2, nodes + [NNamespace(pfx, uri)], text_elems, dotted_names),
       None => {
         match parse_text_directive(s, p1) {
-          Some((names, p2)) => parse_document(s, p2, nodes, text_elems + names),
+          Some((names, p2)) => parse_document(s, p2, nodes, text_elems + names, dotted_names),
           None => {
             let p2 = skip_to_eol(s, p1)
-            parse_document(s, p2, nodes, text_elems)
+            parse_document(s, p2, nodes, text_elems, dotted_names)
           }
         }
       }
@@ -872,8 +912,12 @@ pub fun parse_document(s: string, pos: int, nodes: list<HmlNode>, text_elems: li
           match parse_value(s, p4, text_elems) {
             Ok((val, p5)) => {
               let new_node = wrap_dotted_value(segments, val)
-              if length(segments) > 1 { parse_document(s, p5, insert_or_merge(nodes, new_node), text_elems) }
-              else { parse_document(s, p5, nodes + [new_node], text_elems) }
+              let root = first_segment(segments)
+              if length(segments) > 1 && has_elem_named(nodes, root) && !list_contains(dotted_names, root) {
+                Err("merge rule: cannot mix dotted key '" + root + ".*' with explicit @" + root)
+              }
+              else if length(segments) > 1 { parse_document(s, p5, insert_or_merge(nodes, new_node), text_elems, add_if_missing(dotted_names, root)) }
+              else { parse_document(s, p5, nodes + [new_node], text_elems, dotted_names) }
             },
             Err(e) => Err(e)
           }
@@ -886,7 +930,7 @@ pub fun parse_document(s: string, pos: int, nodes: list<HmlNode>, text_elems: li
 }
 
 pub fun hml_parse(input: string) : result<list<HmlNode>, string> =>
-  parse_document(input, 0, [], default_text_elems())
+  parse_document(input, 0, [], default_text_elems(), [])
 
 // ============================================================
 // File-based parsing with #include support
@@ -951,20 +995,26 @@ pub fun parse_namespace_directive(s: string, pos: int) : maybe<(string, string, 
   }
 }
 
-pub fun include_file_nodes(s: string, p2: int, content: string, full_path: string, nodes: list<HmlNode>, base_dir: string, seen: list<string>, text_elems: list<string>) : result<list<HmlNode>, string> {
+pub fun include_file_nodes(s: string, p2: int, content: string, full_path: string, nodes: list<HmlNode>, base_dir: string, seen: list<string>, text_elems: list<string>, dotted_names: list<string>) : result<list<HmlNode>, string> {
   let inc_base = dir_of_path(full_path)
-  match parse_file_doc(content, 0, [], inc_base, seen + [full_path], text_elems) {
-    Ok(inc_nodes) => parse_file_doc(s, skip_to_eol(s, p2), nodes + inc_nodes, base_dir, seen, text_elems),
+  match parse_file_doc(content, 0, [], inc_base, seen + [full_path], text_elems, []) {
+    Ok(inc_nodes) => parse_file_doc(s, skip_to_eol(s, p2), nodes + inc_nodes, base_dir, seen, text_elems, dotted_names),
     Err(e) => Err(e)
   }
 }
 
-pub fun parse_file_doc(s: string, pos: int, nodes: list<HmlNode>, base_dir: string, seen: list<string>, text_elems: list<string>) : result<list<HmlNode>, string> {
+pub fun parse_file_doc(s: string, pos: int, nodes: list<HmlNode>, base_dir: string, seen: list<string>, text_elems: list<string>, dotted_names: list<string>) : result<list<HmlNode>, string> {
   let p1 = skip_noise(s, pos)
   if p1 >= str_length(s) { Ok(nodes) }
   else if peek(s, p1) == "@" {
     match parse_element(s, p1, text_elems) {
-      Ok((elem, p2)) => parse_file_doc(s, p2, nodes + [NElem(elem)], base_dir, seen, text_elems),
+      Ok((elem, p2)) => {
+        let ename = hml_elem_name(elem)
+        if list_contains(dotted_names, ename) {
+          Err("merge rule: cannot mix explicit @" + ename + " with dotted key '" + ename + ".*'")
+        }
+        else { parse_file_doc(s, p2, nodes + [NElem(elem)], base_dir, seen, text_elems, dotted_names) }
+      },
       Err(e) => Err(e)
     }
   }
@@ -975,18 +1025,18 @@ pub fun parse_file_doc(s: string, pos: int, nodes: list<HmlNode>, base_dir: stri
         if list_contains(seen, full_path) { Err("circular include: " + full_path) }
         else {
           match read_file(full_path) {
-            Ok(content) => include_file_nodes(s, p2, content, full_path, nodes, base_dir, seen, text_elems),
+            Ok(content) => include_file_nodes(s, p2, content, full_path, nodes, base_dir, seen, text_elems, dotted_names),
             Err(_) => Err("cannot read included file: " + full_path)
           }
         }
       },
       None => {
         match parse_namespace_directive(s, p1) {
-          Some((pfx, uri, p2)) => parse_file_doc(s, p2, nodes + [NNamespace(pfx, uri)], base_dir, seen, text_elems),
+          Some((pfx, uri, p2)) => parse_file_doc(s, p2, nodes + [NNamespace(pfx, uri)], base_dir, seen, text_elems, dotted_names),
           None => {
             match parse_text_directive(s, p1) {
-              Some((names, p2)) => parse_file_doc(s, p2, nodes, base_dir, seen, text_elems + names),
-              None => parse_file_doc(s, skip_to_eol(s, p1), nodes, base_dir, seen, text_elems)
+              Some((names, p2)) => parse_file_doc(s, p2, nodes, base_dir, seen, text_elems + names, dotted_names),
+              None => parse_file_doc(s, skip_to_eol(s, p1), nodes, base_dir, seen, text_elems, dotted_names)
             }
           }
         }
@@ -1002,8 +1052,12 @@ pub fun parse_file_doc(s: string, pos: int, nodes: list<HmlNode>, base_dir: stri
           match parse_value(s, p4, text_elems) {
             Ok((val, p5)) => {
               let new_node = wrap_dotted_value(segments, val)
-              if length(segments) > 1 { parse_file_doc(s, p5, insert_or_merge(nodes, new_node), base_dir, seen, text_elems) }
-              else { parse_file_doc(s, p5, nodes + [new_node], base_dir, seen, text_elems) }
+              let root = first_segment(segments)
+              if length(segments) > 1 && has_elem_named(nodes, root) && !list_contains(dotted_names, root) {
+                Err("merge rule: cannot mix dotted key '" + root + ".*' with explicit @" + root)
+              }
+              else if length(segments) > 1 { parse_file_doc(s, p5, insert_or_merge(nodes, new_node), base_dir, seen, text_elems, add_if_missing(dotted_names, root)) }
+              else { parse_file_doc(s, p5, nodes + [new_node], base_dir, seen, text_elems, dotted_names) }
             },
             Err(e) => Err(e)
           }
@@ -1017,7 +1071,7 @@ pub fun parse_file_doc(s: string, pos: int, nodes: list<HmlNode>, base_dir: stri
 
 pub fun hml_parse_file_content(content: string, path: string) : result<list<HmlNode>, string> {
   let base = dir_of_path(path)
-  parse_file_doc(content, 0, [], base, [path], default_text_elems())
+  parse_file_doc(content, 0, [], base, [path], default_text_elems(), [])
 }
 
 pub fun hml_parse_file(path: string) : result<list<HmlNode>, string> {

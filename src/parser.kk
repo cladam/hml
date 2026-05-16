@@ -876,11 +876,11 @@ pub fun hc_is_newline(c : string) : bool
 
 // .hc:16
 pub fun hc_is_digit(c : string) : bool
-  "0123456789".contains(c)
+  ((c != "") && "0123456789".contains(c))
 
 // .hc:19
 pub fun hc_is_alpha(c : string) : bool
-  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".contains(c)
+  ((c != "") && "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".contains(c))
 
 // .hc:22
 pub fun hc_is_bare_key_char(c : string) : bool
@@ -888,7 +888,7 @@ pub fun hc_is_bare_key_char(c : string) : bool
 
 // .hc:25
 pub fun hc_is_hex_char(c : string) : bool
-  "0123456789abcdefABCDEF".contains(c)
+  ((c != "") && "0123456789abcdefABCDEF".contains(c))
 
 // .hc:28
 pub fun hc_hex_digit_val(c : string) : int

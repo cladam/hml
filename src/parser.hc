@@ -16,16 +16,16 @@ pub fun is_newline(c: string) : bool =>
   c == "\n" || c == "\r"
 
 pub fun is_digit(c: string) : bool =>
-  contains("0123456789", c)
+  c != "" && contains("0123456789", c)
 
 pub fun is_alpha(c: string) : bool =>
-  contains("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", c)
+  c != "" && contains("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", c)
 
 pub fun is_bare_key_char(c: string) : bool =>
   is_alpha(c) || is_digit(c) || c == "-" || c == "_"
 
 pub fun is_hex_char(c: string) : bool =>
-  contains("0123456789abcdefABCDEF", c)
+  c != "" && contains("0123456789abcdefABCDEF", c)
 
 pub fun hex_digit_val(c: string) : int {
   if c == "0" { 0 } else if c == "1" { 1 } else if c == "2" { 2 }

@@ -170,7 +170,7 @@ fun collect_block_lines(st: ConvertState, min_indent: int) : (list<string>, Conv
 }
 
 // Convert block scalar lines to an HML multi-line string
-fun block_to_hml_string(block_lines: list<string>, style: string) : string {
+fun block_to_hml_string(block_lines: list<string>) : string {
     let content = join(block_lines, "\n")
     // Use HML triple-quoted multi-line string
     "\"\"\"\n" + content + "\n\"\"\""
@@ -456,7 +456,7 @@ fun convert_block(st: ConvertState, parent_indent: int, depth: int) : (list<stri
                                         let block_result = collect_block_lines(st2, block_indent)
                                         let blines = block_result.0
                                         let st3 = block_result.1
-                                        let hval = block_to_hml_string(blines, after)
+                                        let hval = block_to_hml_string(blines)
                                         let out_line = pad + hkey + ": " + hval
                                         let rest = convert_block(st3, parent_indent, depth)
                                         ([out_line] + rest.0, rest.1)
@@ -526,8 +526,7 @@ fun convert_block(st: ConvertState, parent_indent: int, depth: int) : (list<stri
 fun yaml_to_hml(input: string) : string {
     let raw_lines = lines(input)
     // Filter out empty trailing lines
-    let ylines = filter(raw_lines, (l) => true)
-    let st = make_state(ylines)
+    let st = make_state(raw_lines)
     let result = convert_block(st, 0, 0)
     join(result.0, "\n")
 }

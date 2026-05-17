@@ -11,6 +11,9 @@ import std/os/path
 effect hica-brk
   ctl hica-break() : a
 
+extern hica-exit( code : int ) : a
+  c inline "(exit(kk_integer_clamp32(#1, kk_context())), kk_box_null())"
+
 fun hc-assert( b : bool ) : exn ()
   if !b then throw("assertion failed")
 
@@ -733,6 +736,37 @@ fun hc_get_opt_or(r : cliresult, name : string, default : string)
     Nothing ->
       default
 
+fun hc_get_opt_int(r : cliresult, name : string)
+  match hc_get_opt(r, name)
+    Just(v) ->
+      v.parse-int
+    Nothing ->
+      Nothing
+
+fun hc_get_opt_int_or(r : cliresult, name : string, default : int) : int
+  match hc_get_opt_int(r, name)
+    Just(v) ->
+      v
+    Nothing ->
+      default
+
+fun hc_get_opt_float(r : cliresult, name : string)
+  match hc_get_opt(r, name)
+    Just(v) ->
+      v.parse-float64
+    Nothing ->
+      Nothing
+
+fun hc_get_opt_float_or(r : cliresult, name : string, default : float64) : float64
+  match hc_get_opt_float(r, name)
+    Just(v) ->
+      v
+    Nothing ->
+      default
+
+fun hc_get_positional(r : cliresult, index : int)
+  if (index < list/length(r.cli_positionals)) then Just(r.cli_positionals[index].unjust) else Nothing
+
 fun hc_get_positionals(r : cliresult)
   r.cli_positionals
 
@@ -777,6 +811,8 @@ fun hc_parse_loop(spec : clispec, args : list<string>)
   var sub_args := []
   var remaining : list<string> := args
   var error : string := ""
+  var short_chars := []
+  var si : int := 0
   val _ =
     with handler
       ctl hica-break() -> ()
@@ -818,20 +854,30 @@ fun hc_parse_loop(spec : clispec, args : list<string>)
               Nothing ->
                 error := ("unknown option: --" ++ name)
       else if a.starts-with("-").is-just then
-        val s : string = hc_removeprefix(a, "-")
-        match hc_find_flag_short(spec.app_flags, s)
-          Just(f) ->
-            flags := (flags ++ [f.flag_name])
-          Nothing ->
-            match hc_find_opt_short(spec.app_options, s)
-              Just(o) ->
-                if (list/length(remaining) == 0) then
-                  error := ("option -" ++ s ++ " requires a value")
-                else
-                  options := (options ++ [(o.opt_name, remaining[0].unjust)])
-                  remaining := drop(remaining, 1)
-              Nothing ->
-                error := ("unknown option: -" ++ s)
+        short_chars := map(hc_removeprefix(a, "-").list, fn(c) c.string)
+        si := 0
+        while { ((si < list/length(short_chars)) && hc_is_empty(error)) }
+          val c : string = short_chars[si].unjust
+          match hc_find_flag_short(spec.app_flags, c)
+            Just(f) ->
+              flags := (flags ++ [f.flag_name])
+              si := (si + 1)
+            Nothing ->
+              match hc_find_opt_short(spec.app_options, c)
+                Just(o) ->
+                  if ((si + 1) < list/length(short_chars)) then
+                    options := (options ++ [(o.opt_name, drop(short_chars, (si + 1)).join(""))])
+                    si := list/length(short_chars)
+                  else if (list/length(remaining) == 0) then
+                    error := ("option -" ++ c ++ " requires a value")
+                    si := (si + 1)
+                  else
+                    options := (options ++ [(o.opt_name, remaining[0].unjust)])
+                    remaining := drop(remaining, 1)
+                    si := (si + 1)
+                Nothing ->
+                  error := ("unknown option: -" ++ c)
+                  si := (si + 1)
       else
         match hc_find_command(spec.app_commands, a)
           Just(_) ->
@@ -883,13 +929,16 @@ fun hc_cli_parse_or_exit(spec : clispec)
       r
     Help ->
       println(hc_cli_help(spec))
+      hica-exit(0)
       hc_cli_empty()
     Version ->
       println(hc_cli_version_str(spec))
+      hica-exit(0)
       hc_cli_empty()
     CliError(msg) ->
       trace(("error: " ++ msg))
       trace("try --help for usage")
+      hica-exit(1)
       hc_cli_empty()
 
 fun hc_read_lines(file_path : string)

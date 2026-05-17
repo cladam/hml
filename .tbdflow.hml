@@ -1,0 +1,70 @@
+main-branch-name: "main"
+release-url-template: "https://github.com/owner/repository/releases/tag/{{version}}"
+stale-branch-threshold-days: 1
+@monorepo {
+    enabled: false
+    project-dirs: []
+}
+@issue-handling {
+    strategy: "branch-name"
+}
+@review {
+    enabled: false
+    default-reviewers: []
+    strategy: "github-issue"
+    workflow: null
+    rules: []
+    @labels {
+        pending: "review-pending"
+        concern: "review-concern"
+        accepted: "review-accepted"
+        dismissed: "review-dismissed"
+    }
+    concern-blocks-status: false
+}
+@radar {
+    enabled: false
+    level: "file"
+    on-sync: true
+    on-commit: false
+    ignore-patterns: ["*.lock", "*-lock.*", "CHANGELOG.md"]
+}
+@ci-check {
+    enabled: false
+}
+@branch-types {
+    fix: "fix/"
+    feature: "feature_"
+    ci: "ci/"
+    feat: "feat/"
+    release: "release_"
+    docs: "docs/"
+    chore: "chore/"
+    refactor: "refactor/"
+}
+@automatic-tags {
+    release-prefix: "v"
+}
+@lint {
+    @conventional-commit-type {
+        enabled: true
+        allowed-types: ["build", "chore", "ci", "docs", "feat", "fix", "perf", "refactor", "revert", "style", "test"]
+    }
+    @issue-key-missing {
+        enabled: false
+        pattern: "^[A-Z]+-\d+$"
+    }
+    @scope {
+        enabled: true
+        enforce-lowercase: true
+    }
+    @subject-line-rules {
+        max-length: 72
+        enforce-lowercase: true
+        no-period: true
+    }
+    @body-line-rules {
+        max-line-length: 80
+        leading-blank: true
+    }
+}

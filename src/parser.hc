@@ -1,5 +1,6 @@
 // parser.hc — HML parser
 import "./hml_types"
+import "std/datetime"
 
 // ============================================================
 // Character helpers
@@ -15,14 +16,14 @@ pub fun is_ws(c: string) : bool =>
 pub fun is_newline(c: string) : bool =>
   c == "\n" || c == "\r"
 
-pub fun is_digit(c: string) : bool =>
+pub fun hml_is_digit(c: string) : bool =>
   c != "" && contains("0123456789", c)
 
-pub fun is_alpha(c: string) : bool =>
+pub fun hml_is_alpha(c: string) : bool =>
   c != "" && contains("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", c)
 
 pub fun is_bare_key_char(c: string) : bool =>
-  is_alpha(c) || is_digit(c) || c == "-" || c == "_"
+  hml_is_alpha(c) || hml_is_digit(c) || c == "-" || c == "_"
 
 pub fun is_hex_char(c: string) : bool =>
   c != "" && contains("0123456789abcdefABCDEF", c)
@@ -255,8 +256,8 @@ pub fun wrap_dotted_value(segments: list<string>, val: Hml) : HmlNode {
 
 pub fun parse_int_digits(s: string, pos: int, acc: string) : (string, int) {
   if pos >= str_length(s) { (acc, pos) }
-  else if is_digit(peek(s, pos)) { parse_int_digits(s, pos + 1, acc + peek(s, pos)) }
-  else if peek(s, pos) == "_" && pos + 1 < str_length(s) && is_digit(peek(s, pos + 1)) {
+  else if hml_is_digit(peek(s, pos)) { parse_int_digits(s, pos + 1, acc + peek(s, pos)) }
+  else if peek(s, pos) == "_" && pos + 1 < str_length(s) && hml_is_digit(peek(s, pos + 1)) {
     parse_int_digits(s, pos + 1, acc)
   }
   else { (acc, pos) }
@@ -290,7 +291,7 @@ pub fun finish_time_frac(s: string, pos: int, time_str: string) : result<(Hml, i
 pub fun try_parse_time(s: string, pos: int, hour: string) : result<(Hml, int), string> {
   // pos is at ':' after HH. Match :MM:SS [.frac]
   if pos + 6 > str_length(s) { Err("incomplete time") }
-  else if !is_digit(peek(s, pos+1)) || !is_digit(peek(s, pos+2)) || peek(s, pos+3) != ":" || !is_digit(peek(s, pos+4)) || !is_digit(peek(s, pos+5)) {
+  else if !hml_is_digit(peek(s, pos+1)) || !hml_is_digit(peek(s, pos+2)) || peek(s, pos+3) != ":" || !hml_is_digit(peek(s, pos+4)) || !hml_is_digit(peek(s, pos+5)) {
     Err("invalid time format")
   }
   else {
@@ -303,7 +304,7 @@ pub fun try_parse_time(s: string, pos: int, hour: string) : result<(Hml, int), s
 pub fun try_parse_tz_offset(s: string, pos: int, dt_prefix: string) : result<(Hml, int), string> {
   let sign = peek(s, pos)
   if pos + 6 > str_length(s) { Err("incomplete timezone offset") }
-  else if !is_digit(peek(s, pos+1)) || !is_digit(peek(s, pos+2)) || peek(s, pos+3) != ":" || !is_digit(peek(s, pos+4)) || !is_digit(peek(s, pos+5)) {
+  else if !hml_is_digit(peek(s, pos+1)) || !hml_is_digit(peek(s, pos+2)) || peek(s, pos+3) != ":" || !hml_is_digit(peek(s, pos+4)) || !hml_is_digit(peek(s, pos+5)) {
     Err("invalid timezone offset format")
   }
   else {
@@ -334,7 +335,7 @@ pub fun finish_datetime(s: string, pos: int, date_str: string, time_str: string)
 pub fun try_parse_datetime_time(s: string, pos: int, date_str: string) : result<(Hml, int), string> {
   // pos is right after T. Parse HH:MM:SS [.frac] [offset]
   if pos + 8 > str_length(s) { Err("incomplete time in datetime") }
-  else if !is_digit(peek(s, pos)) || !is_digit(peek(s, pos+1)) || peek(s, pos+2) != ":" || !is_digit(peek(s, pos+3)) || !is_digit(peek(s, pos+4)) || peek(s, pos+5) != ":" || !is_digit(peek(s, pos+6)) || !is_digit(peek(s, pos+7)) {
+  else if !hml_is_digit(peek(s, pos)) || !hml_is_digit(peek(s, pos+1)) || peek(s, pos+2) != ":" || !hml_is_digit(peek(s, pos+3)) || !hml_is_digit(peek(s, pos+4)) || peek(s, pos+5) != ":" || !hml_is_digit(peek(s, pos+6)) || !hml_is_digit(peek(s, pos+7)) {
     Err("invalid time format in datetime")
   }
   else {
@@ -346,7 +347,7 @@ pub fun try_parse_datetime_time(s: string, pos: int, date_str: string) : result<
 pub fun try_parse_date(s: string, pos: int, year: string) : result<(Hml, int), string> {
   // pos is at '-' after YYYY. Match -MM-DD [T time [offset]]
   if pos + 6 > str_length(s) { Err("incomplete date") }
-  else if !is_digit(peek(s, pos+1)) || !is_digit(peek(s, pos+2)) || peek(s, pos+3) != "-" || !is_digit(peek(s, pos+4)) || !is_digit(peek(s, pos+5)) {
+  else if !hml_is_digit(peek(s, pos+1)) || !hml_is_digit(peek(s, pos+2)) || peek(s, pos+3) != "-" || !hml_is_digit(peek(s, pos+4)) || !hml_is_digit(peek(s, pos+5)) {
     Err("invalid date format")
   }
   else {
@@ -379,11 +380,11 @@ pub fun parse_number_or_duration(s: string, pos: int) : result<(Hml, int), strin
     let (digits_str, p2) = parse_int_digits(s, sign_pos, "")
     if str_length(digits_str) == 0 { Err("expected number at position " + show(pos)) }
     // Date: YYYY-MM-DD...
-    else if sign_str == "" && str_length(digits_str) == 4 && peek(s, p2) == "-" && is_digit(peek(s, p2 + 1)) {
+    else if sign_str == "" && str_length(digits_str) == 4 && peek(s, p2) == "-" && hml_is_digit(peek(s, p2 + 1)) {
       try_parse_date(s, p2, digits_str)
     }
     // Time: HH:MM:SS...
-    else if sign_str == "" && str_length(digits_str) == 2 && peek(s, p2) == ":" && is_digit(peek(s, p2 + 1)) {
+    else if sign_str == "" && str_length(digits_str) == 2 && peek(s, p2) == ":" && hml_is_digit(peek(s, p2 + 1)) {
       try_parse_time(s, p2, digits_str)
     }
     else {
@@ -495,7 +496,7 @@ pub fun parse_value(s: string, pos: int, text_elems: list<string>) : result<(Hml
   }
   else if peek(s, p) == "[" { parse_array(s, p + 1, [], text_elems) }
   else if peek(s, p) == "@" { parse_inline_element(s, p, text_elems) }
-  else if is_digit(peek(s, p)) || peek(s, p) == "+" || peek(s, p) == "-" {
+  else if hml_is_digit(peek(s, p)) || peek(s, p) == "+" || peek(s, p) == "-" {
     parse_number_or_duration(s, p)
   }
   else { Err("unexpected character '" + peek(s, p) + "' at position " + show(p)) }

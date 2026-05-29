@@ -27,8 +27,8 @@
 import "../src/hml"
 
 type YamlLine {
-    YKeyVal(indent: int, key: string, value: string),
-    YListItem(indent: int, value: string),
+    YKeyVal(indent: int, key: string, text: string),
+    YListItem(indent: int, text: string),
     YKeyOnly(indent: int, key: string),
     YBlank,
     YComment(text: string)

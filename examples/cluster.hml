@@ -1,0 +1,18 @@
+@cluster(region: "eu-west-1", version: "1.28") {
+    @node(id: "node-1", role: "control-plane") {
+        host: "10.0.0.1"
+        status: "ready"
+    }
+    @node(id: "node-2", role: "worker") {
+        host: "10.0.0.2"
+        status: "ready"
+    }
+    @node(id: "node-3", role: "worker") {
+        host: "10.0.0.3"
+        status: "ready"
+    }
+    @node(id: "node-4", role: "worker") {
+        host: "10.0.0.4"
+        status: "not-ready"
+    }
+}

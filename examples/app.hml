@@ -1,0 +1,5 @@
+app_name: "myapp"
+environment: "staging"
+
+#include "config.hml"
+#include "cluster.hml"

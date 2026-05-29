@@ -1,0 +1,21 @@
+@k8s.deployment(name: "api-server", namespace: "production") {
+    replicas: 3
+
+    @k8s.container(name: "api", image: "api-server:1.4.2") {
+        @probe(type: "liveness") {
+            path: "/healthz"
+            port: 8080
+        }
+        @probe(type: "readiness") {
+            path: "/ready"
+            port: 8080
+        }
+    }
+
+    @k8s.container(name: "sidecar", image: "envoy:1.29") {
+        @probe(type: "liveness") {
+            path: "/healthz/ready"
+            port: 9901
+        }
+    }
+}

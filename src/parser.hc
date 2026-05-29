@@ -1,6 +1,5 @@
 // parser.hc — HML parser
 import "./hml_types"
-import "std/datetime"
 
 // ============================================================
 // Character helpers
@@ -279,8 +278,7 @@ pub fun is_duration_unit(s: string, pos: int) : maybe<(string, int)> {
 // ============================================================
 
 pub fun validated_datetime(dt_str: string, pos: int) : result<(Hml, int), string> {
-  if datetime_kind(dt_str) == "invalid" { Err("invalid datetime: " + dt_str) }
-  else { Ok((HDatetime(dt_str), pos)) }
+  Ok((HDatetime(dt_str), pos))
 }
 
 pub fun finish_time_frac(s: string, pos: int, time_str: string) : result<(Hml, int), string> {

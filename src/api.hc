@@ -102,6 +102,14 @@ pub fun hml_ok(r: result<list<HmlNode>, string>) : maybe<list<HmlNode>> => match
   Err(_) => None
 }
 
+pub fun hml_texts(nodes: list<HmlNode>) : list<string> {
+  match nodes {
+    [] => [],
+    [NText(content), ..rest] => [content] + hml_texts(rest),
+    [_, ..rest] => hml_texts(rest)
+  }
+}
+
 pub fun hml_namespaces(nodes: list<HmlNode>) : list<(string, string)> {
   match nodes {
     [] => [],

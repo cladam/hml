@@ -1,0 +1,15 @@
+@article(category: "engineering") {
+    title: "On Code Stillness"
+    author: "Claes Adamsson"
+
+    @body {
+        HML lets structured config and prose live in the same file.
+        We can embed @em{inline emphasis} or a @link(href: "https://hica.dev"){hyperlink} seamlessly.
+
+        @p(class: "lead") {
+            An explicit paragraph node, use it when you need to attach
+            attributes or address the paragraph as a distinct tree node.
+            For plain paragraph breaks, a blank line is sufficient.
+        }
+    }
+}

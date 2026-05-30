@@ -1,4 +1,4 @@
-# HML v0.3.0
+# HML v0.4.0
 
 Hica Markup Language.
 
@@ -438,10 +438,41 @@ This maps to:
 
 ## Text Content (Mixed Content)
 
-Text content requires an **explicit wrapper element**; it is not allowed
-implicitly in any element body. This prevents ambiguity where a typo in a
-property key (e.g., forgetting a colon: `timeout 30s`) would silently parse as
-text instead of raising a syntax error.
+Most structured formats — YAML, TOML, JSON — have no concept of mixed content:
+you cannot embed flowing prose alongside structured properties without resorting
+to multi-line string escaping. HML fills this gap with **text-mode elements**,
+which let natural prose coexist with structured data in the same document.
+
+Text content requires an **explicit wrapper element** and is not allowed
+implicitly in any element body. The explicit boundary serves two purposes: it
+keeps the parser unambiguous (a bare word like `timeout 30s` without a colon
+raises a syntax error rather than silently becoming text), and it makes intent
+clear to both humans and tooling.
+
+A document that mixes config and prose — impossible to express cleanly in YAML
+or TOML:
+
+```
+@service(name: "api", port: 8080) {
+    timeout: 30s
+    retries: 3
+
+    @body {
+        The API service handles all inbound requests.
+        It @em{must} be restarted after config changes.
+
+        See @link(href: "https://docs.example.com"){the runbook} for details.
+    }
+}
+```
+
+Contrast with the error a bare word produces outside a text element:
+
+```
+@service(name: "api") {
+    timeout 30s   // ERROR: expected ':', got '30s'
+}
+```
 
 ### Built-in Text Elements
 
@@ -463,35 +494,47 @@ three built-in names are valid text containers.
 
 ### Text Mode Behaviour
 
-Text elements switch the parser into text mode within their braces. Inline
-elements within text are delimited with the short form `@name{content}`:
+Text elements switch the parser into **text mode** within their braces. In text
+mode, raw prose is collected as text nodes. Inline elements are delimited with
+the compact form `@name{content}` or `@name(attrs){content}` (no space before
+the opening brace):
 
 ```
 @article(category: "engineering") {
     title: "On Code Stillness"
 
     @body {
-        This is a paragraph explaining the philosophy of HML.
-        We can embed @em{inline emphasis} or even a
-        @link(href: "https://hica.dev"){hyperlink} seamlessly.
+        This is prose at the top level of the body.
+        We can embed @em{inline emphasis} or a @link(href: "https://hica.dev"){hyperlink} seamlessly.
 
-        @p {
-            A new paragraph can be explicitly marked.
+        @p(class: "lead") {
+            An explicit paragraph node. Use @p when you need to attach
+            attributes or address the paragraph as a distinct tree node.
+            For plain paragraph breaks, a blank line is sufficient.
         }
     }
 }
 ```
 
+**Paragraphs**: A blank line between runs of text is a paragraph-break hint for
+renderers; it does not create a node in the document tree. An explicit `@p { }`
+creates a named paragraph node — use it when you need attributes or a
+structurally addressable unit. Multiple consecutive blank lines are treated the
+same as one.
+
 Text content rules:
 - Text content is only valid inside text-mode elements (built-in or declared via
   `#text` directive or schema).
-- A line that matches `key: value` inside a text element is still parsed as a
-  property. To include a literal colon in text, no special escaping is needed;
-  the parser only treats it as a property if the left side is a valid key token.
+- A line that matches `key: value` inside a text element is parsed as a
+  property. The parser treats a line as a property only if the left side is a
+  valid bare key followed by `:`.
 - Inline elements use the compact form: `@name{text}` or `@name(attrs){text}`
-  (no space before the brace).
-- A blank line separates paragraphs.
-- Leading/trailing whitespace in text blocks is trimmed per-line.
+  (no space before the opening brace). An inline element **must not start a new
+  line** — an `@` at the beginning of a line inside a text body is always
+  parsed as a block element. Wrap long lines rather than splitting an inline
+  element across lines.
+- A blank line is a paragraph-break hint to renderers and produces no AST node.
+- Leading/trailing whitespace in text lines is trimmed per-line.
 
 ## Namespaces
 

@@ -449,8 +449,7 @@ keeps the parser unambiguous (a bare word like `timeout 30s` without a colon
 raises a syntax error rather than silently becoming text), and it makes intent
 clear to both humans and tooling.
 
-A document that mixes config and prose — impossible to express cleanly in YAML
-or TOML:
+A document that mixes config and prose:
 
 ```
 @service(name: "api", port: 8080) {

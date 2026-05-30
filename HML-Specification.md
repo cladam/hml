@@ -438,7 +438,7 @@ This maps to:
 
 ## Text Content (Mixed Content)
 
-Most structured formats — YAML, TOML, JSON — have no concept of mixed content:
+Most structured formats (YAML, TOML, JSON) have no concept of mixed content:
 you cannot embed flowing prose alongside structured properties without resorting
 to multi-line string escaping. HML fills this gap with **text-mode elements**,
 which let natural prose coexist with structured data in the same document.

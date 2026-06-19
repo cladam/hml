@@ -25,14 +25,7 @@
 
 // --- YAML line classification ---
 import "../src/hml"
-
-type YamlLine {
-    YKeyVal(indent: int, key: string, text: string),
-    YListItem(indent: int, text: string),
-    YKeyOnly(indent: int, key: string),
-    YBlank,
-    YComment(text: string)
-}
+import "std/cli"
 
 // Count leading spaces
 fun count_indent(s: string) : int {
@@ -225,30 +218,6 @@ fun find_key_sep_at(s: string, pos: int, len: int) : int {
     }
 }
 
-// Parse a single YAML line into a YamlLine
-fun parse_yaml_line(line: string) : YamlLine {
-    let trimmed = strip(line)
-    if trimmed == "" { YBlank }
-    else if has_prefix(trimmed, "#") { YComment(trimmed[1:]) }
-    else {
-        let indent = count_indent(line)
-        if has_prefix(trimmed, "- ") {
-            YListItem(indent, strip_inline_comment(strip(trimmed[2:])))
-        } else {
-            // Look for "key: value" (colon + space) or "key:" (colon at end)
-            let sep = find_key_sep(trimmed)
-            if sep >= 0 {
-                let key = trimmed[:sep]
-                let after = strip_inline_comment(strip(trimmed[sep + 1:]))
-                if after == "" { YKeyOnly(indent, key) }
-                else { YKeyVal(indent, key, after) }
-            } else {
-                YListItem(indent, trimmed)
-            }
-        }
-    }
-}
-
 // --- Converter state ---
 
 struct ConvertState {
@@ -402,6 +371,104 @@ fun is_list_of_objects(st: ConvertState, expected_indent: int) : bool {
     }
 }
 
+// Convert a YAML comment line to a HML // comment
+fun convert_comment(trimmed: string, pad: string, st: ConvertState, parent_indent: int, depth: int) : (list<string>, ConvertState) {
+    let comment_text = trimmed[1:]
+    let spaced = if has_prefix(comment_text, " ") { comment_text } else { " " + comment_text }
+    let st2 = advance(st)
+    let rest = convert_block(st2, parent_indent, depth)
+    ([pad + "//" + spaced] + rest.0, rest.1)
+}
+
+// Collect top-level "- item" list items and emit as an HML array
+fun convert_list_line(st: ConvertState, parent_indent: int, depth: int) : (list<string>, ConvertState) {
+    let items_result = collect_list_items(st, parent_indent)
+    let items = items_result.0
+    let st2 = items_result.1
+    let arr = "[" + join(items, ", ") + "]"
+    let rest = convert_block(st2, parent_indent, depth)
+    ([arr] + rest.0, rest.1)
+}
+
+// Handle a block scalar value (| or >) → triple-quoted HML string
+fun convert_block_scalar_key(hkey: string, pad: string, st2: ConvertState, parent_indent: int, depth: int) : (list<string>, ConvertState) {
+    let block_indent = parent_indent + 2
+    let block_result = collect_block_lines(st2, block_indent)
+    let blines = block_result.0
+    let st3 = block_result.1
+    let hval = block_to_hml_string(blines)
+    let out_line = pad + hkey + ": " + hval
+    let rest = convert_block(st3, parent_indent, depth)
+    ([out_line] + rest.0, rest.1)
+}
+
+// Handle a key with no inline value — next lines are a list or nested @element block
+fun convert_nested_key(hkey: string, pad: string, st2: ConvertState, parent_indent: int, depth: int) : (list<string>, ConvertState) {
+    let list_indent = peek_list_indent(st2, parent_indent)
+    if list_indent >= 0 {
+        if is_list_of_objects(st2, list_indent) {
+            // List of objects → repeated @elements
+            let obj_result = collect_object_list(st2, list_indent, hkey, depth)
+            let obj_lines = obj_result.0
+            let st3 = obj_result.1
+            let rest = convert_block(st3, parent_indent, depth)
+            (obj_lines + rest.0, rest.1)
+        } else {
+            // Scalar list → HML array
+            let items_result = collect_list_items(st2, list_indent)
+            let items = items_result.0
+            let st3 = items_result.1
+            let arr = "[" + join(items, ", ") + "]"
+            let out_line = pad + hkey + ": " + arr
+            let rest = convert_block(st3, parent_indent, depth)
+            ([out_line] + rest.0, rest.1)
+        }
+    } else {
+        // Nested object → @element block
+        let child_indent = parent_indent + 2
+        let body_result = convert_block(st2, child_indent, depth + 1)
+        let body_lines = body_result.0
+        let st3 = body_result.1
+        let header = pad + "@" + hkey + " \{"
+        let footer = pad + "\}"
+        let block = [header] + body_lines + [footer]
+        let rest = convert_block(st3, parent_indent, depth)
+        (block + rest.0, rest.1)
+    }
+}
+
+// Handle a key with a scalar or flow-map value
+fun convert_scalar_key(after: string, hkey: string, pad: string, st2: ConvertState, parent_indent: int, depth: int) : (list<string>, ConvertState) {
+    if is_flow_map(after) {
+        let out_line = pad + convert_flow_map(after, hkey)
+        let rest = convert_block(st2, parent_indent, depth)
+        ([out_line] + rest.0, rest.1)
+    } else {
+        let hval = hml_value(after)
+        let out_line = pad + hkey + ": " + hval
+        let rest = convert_block(st2, parent_indent, depth)
+        ([out_line] + rest.0, rest.1)
+    }
+}
+
+// Dispatch a key: value line (or emit unrecognised line as a comment)
+fun convert_key(trimmed: string, pad: string, st: ConvertState, parent_indent: int, depth: int) : (list<string>, ConvertState) {
+    let sep = find_key_sep(trimmed)
+    if sep >= 0 {
+        let key = trimmed[:sep]
+        let hkey = to_hml_key(key)
+        let after = strip_inline_comment(strip(trimmed[sep + 1:]))
+        let st2 = advance(st)
+        if is_block_scalar(after) { convert_block_scalar_key(hkey, pad, st2, parent_indent, depth) }
+        else if after == "" { convert_nested_key(hkey, pad, st2, parent_indent, depth) }
+        else { convert_scalar_key(after, hkey, pad, st2, parent_indent, depth) }
+    } else {
+        let st2 = advance(st)
+        let rest = convert_block(st2, parent_indent, depth)
+        ([pad + "// ? " + trimmed] + rest.0, rest.1)
+    }
+}
+
 // Convert a block of YAML lines at a given indent level to HML lines
 fun convert_block(st: ConvertState, parent_indent: int, depth: int) : (list<string>, ConvertState) {
     if done(st) { ([], st) }
@@ -409,115 +476,14 @@ fun convert_block(st: ConvertState, parent_indent: int, depth: int) : (list<stri
         let line = current_line(st)
         let trimmed = strip(line)
         let indent = count_indent(line)
-        // Stop if we've dedented past our parent
         if indent < parent_indent { ([], st) }
+        else if indent > parent_indent { ([], st) }
+        else if trimmed == "" { convert_block(advance(st), parent_indent, depth) }
         else {
-            if indent > parent_indent {
-                // Skip lines with deeper indent than expected (handled by recursion)
-                ([], st)
-            } else {
-                // We're at the expected indent level
-                if trimmed == "" {
-                    // Blank line — skip
-                    let st2 = advance(st)
-                    convert_block(st2, parent_indent, depth)
-                } else {
-                    if has_prefix(trimmed, "#") {
-                        // Comment — convert # to //
-                        let pad = make_pad(depth)
-                        let comment_text = trimmed[1:]
-                        let spaced = if has_prefix(comment_text, " ") { comment_text }
-                                     else { " " + comment_text }
-                        let st2 = advance(st)
-                        let rest = convert_block(st2, parent_indent, depth)
-                        ([pad + "//" + spaced] + rest.0, rest.1)
-                    } else {
-                        if has_prefix(trimmed, "- ") {
-                            // List items at top level of this block
-                            let items_result = collect_list_items(st, parent_indent)
-                            let items = items_result.0
-                            let st2 = items_result.1
-                            let arr = "[" + join(items, ", ") + "]"
-                            let rest = convert_block(st2, parent_indent, depth)
-                            // Return array string (caller adds key:)
-                            ([arr] + rest.0, rest.1)
-                        } else {
-                            // Key: value or Key: (block)
-                            let sep = find_key_sep(trimmed)
-                            if sep >= 0 {
-                                    let key = trimmed[:sep]
-                                    let hkey = to_hml_key(key)
-                                    let after = strip_inline_comment(strip(trimmed[sep + 1:]))
-                                    let pad = make_pad(depth)
-                                    let st2 = advance(st)
-                                    if is_block_scalar(after) {
-                                        // Multi-line block scalar (| or >)
-                                        let block_indent = parent_indent + 2
-                                        let block_result = collect_block_lines(st2, block_indent)
-                                        let blines = block_result.0
-                                        let st3 = block_result.1
-                                        let hval = block_to_hml_string(blines)
-                                        let out_line = pad + hkey + ": " + hval
-                                        let rest = convert_block(st3, parent_indent, depth)
-                                        ([out_line] + rest.0, rest.1)
-                                    } else if after == "" {
-                                        // Block — check if next lines are list items or a nested object
-                                        let list_indent = peek_list_indent(st2, parent_indent)
-                                        if list_indent >= 0 {
-                                            if is_list_of_objects(st2, list_indent) {
-                                                // List of objects → repeated elements (no outer wrapper)
-                                                let obj_result = collect_object_list(st2, list_indent, hkey, depth)
-                                                let obj_lines = obj_result.0
-                                                let st3 = obj_result.1
-                                                let rest = convert_block(st3, parent_indent, depth)
-                                                (obj_lines + rest.0, rest.1)
-                                            } else {
-                                                // Collect as scalar array
-                                                let items_result = collect_list_items(st2, list_indent)
-                                                let items = items_result.0
-                                                let st3 = items_result.1
-                                                let arr = "[" + join(items, ", ") + "]"
-                                                let out_line = pad + hkey + ": " + arr
-                                                let rest = convert_block(st3, parent_indent, depth)
-                                                ([out_line] + rest.0, rest.1)
-                                            }
-                                        } else {
-                                            // Nested object → @element
-                                            let child_indent = parent_indent + 2
-                                            let body_result = convert_block(st2, child_indent, depth + 1)
-                                            let body_lines = body_result.0
-                                            let st3 = body_result.1
-                                            let header = pad + "@" + hkey + " \{"
-                                            let footer = pad + "\}"
-                                            let block = [header] + body_lines + [footer]
-                                            let rest = convert_block(st3, parent_indent, depth)
-                                            (block + rest.0, rest.1)
-                                        }
-                                    } else {
-                                        // Simple key: value
-                                        if is_flow_map(after) {
-                                            // Flow mapping → inline element
-                                            let out_line = pad + convert_flow_map(after, hkey)
-                                            let rest = convert_block(st2, parent_indent, depth)
-                                            ([out_line] + rest.0, rest.1)
-                                        } else {
-                                            let hval = hml_value(after)
-                                            let out_line = pad + hkey + ": " + hval
-                                            let rest = convert_block(st2, parent_indent, depth)
-                                            ([out_line] + rest.0, rest.1)
-                                        }
-                                    }
-                            } else {
-                                    // Unrecognised line, emit as comment
-                                    let pad = make_pad(depth)
-                                    let st2 = advance(st)
-                                    let rest = convert_block(st2, parent_indent, depth)
-                                    ([pad + "// ? " + trimmed] + rest.0, rest.1)
-                            }
-                        }
-                    }
-                }
-            }
+            let pad = make_pad(depth)
+            if has_prefix(trimmed, "#") { convert_comment(trimmed, pad, st, parent_indent, depth) }
+            else if has_prefix(trimmed, "- ") { convert_list_line(st, parent_indent, depth) }
+            else { convert_key(trimmed, pad, st, parent_indent, depth) }
         }
     }
 }
@@ -531,46 +497,208 @@ fun yaml_to_hml(input: string) : string {
     join(result.0, "\n")
 }
 
-fun main() {
-    let args = get_args()
-    if length(args) == 0 {
-        println("Usage: yml2hml [--validate] <input.yml> [output.hml]")
-        println("")
-        println("Converts a YAML file to HML format.")
-        println("If no output file is given, prints to stdout.")
-        println("Use --validate to parse the result with the HML parser.")
-    } else {
-        let validate = length(args) > 0 && args[0] == "--validate"
-        let file_args = if validate { drop(args, 1) } else { args }
-        if length(file_args) == 0 {
-            println("Error: no input file specified")
-        } else {
-            let input_path = file_args[0]
-            match read_file(input_path) {
-                Ok(content) => {
-                    let hml_output = yaml_to_hml(content)
-                    if length(file_args) >= 2 {
-                        let output_path = file_args[1]
-                        write_file(output_path, hml_output + "\n")
-                        println("Converted {input_path} -> {output_path}")
-                    } else {
-                        println(hml_output)
-                    }
-                    if validate {
-                        println("")
-                        println("--- Validation ---")
-                        match hml_parse(hml_output) {
-                            Ok(nodes) => {
-                                println("OK: parsed {length(nodes)} top-level nodes")
-                                println("")
-                                println(hml_pretty(nodes, 0))
-                            },
-                            Err(e) => println("PARSE ERROR: {e}")
-                        }
-                    }
+fun make_spec() =>
+    cli("yml2hml", "1.0.0", "convert YAML files to HML format")
+        |> arg("input", "YAML file to convert", true)
+        |> arg("output", "output HML file (default: stdout)", false)
+
+fun convert(r) {
+    let input_path = r.cli_positionals[0]
+    match read_file(input_path) {
+        Ok(content) => {
+            let hml_output = yaml_to_hml(content)
+            match get_positional(r, 1) {
+                Some(output_path) => {
+                    write_file(output_path, hml_output + "\n")
+                    println("Converted {input_path} -> {output_path}")
                 },
-                Err(e) => println("Error reading {input_path}: {e}")
+                None => println(hml_output)
             }
-        }
+        },
+        Err(e) => eprintln("error: could not read {input_path}: {e}")
     }
+}
+
+fun main() {
+    let spec = make_spec()
+    match cli_parse(spec) {
+        Help          => println(cli_help(spec)),
+        Version       => println(cli_version_str(spec)),
+        CliError(msg) => eprintln("error: {msg}"),
+        Parsed(r)     => convert(r)
+    }
+}
+
+// --- Tests ---
+
+test "count_indent: empty string" {
+    assert_eq(count_indent(""), 0)
+}
+
+test "count_indent: no indent" {
+    assert_eq(count_indent("key: val"), 0)
+}
+
+test "count_indent: two spaces" {
+    assert_eq(count_indent("  key: val"), 2)
+}
+
+test "count_indent: four spaces" {
+    assert_eq(count_indent("    value"), 4)
+}
+
+test "to_hml_key: underscores become dashes" {
+    assert_eq(to_hml_key("my_key_name"), "my-key-name")
+}
+
+test "to_hml_key: no underscores unchanged" {
+    assert_eq(to_hml_key("key"), "key")
+}
+
+test "hml_value: bare string gets quoted" {
+    assert_eq(hml_value("hello"), "\"hello\"")
+}
+
+test "hml_value: integer stays unquoted" {
+    assert_eq(hml_value("42"), "42")
+}
+
+test "hml_value: float stays unquoted" {
+    assert_eq(hml_value("3.14"), "3.14")
+}
+
+test "hml_value: true bool" {
+    assert_eq(hml_value("true"), "true")
+}
+
+test "hml_value: yes maps to true" {
+    assert_eq(hml_value("yes"), "true")
+}
+
+test "hml_value: false bool" {
+    assert_eq(hml_value("false"), "false")
+}
+
+test "hml_value: off maps to false" {
+    assert_eq(hml_value("off"), "false")
+}
+
+test "hml_value: null" {
+    assert_eq(hml_value("null"), "null")
+}
+
+test "hml_value: tilde is null" {
+    assert_eq(hml_value("~"), "null")
+}
+
+test "hml_value: empty string" {
+    assert_eq(hml_value(""), "\"\"")
+}
+
+test "hml_value: already double-quoted passthrough" {
+    assert_eq(hml_value("\"hello world\""), "\"hello world\"")
+}
+
+test "hml_value: single-quoted becomes double-quoted" {
+    assert_eq(hml_value("'hello'"), "\"hello\"")
+}
+
+test "hml_value: flow sequence" {
+    assert_eq(hml_value("[a, b, c]"), "[\"a\", \"b\", \"c\"]")
+}
+
+test "strip_inline_comment: no comment" {
+    assert_eq(strip_inline_comment("value"), "value")
+}
+
+test "strip_inline_comment: strips trailing comment" {
+    assert_eq(strip_inline_comment("value # note"), "value")
+}
+
+test "strip_inline_comment: quoted value preserves hash" {
+    assert_eq(strip_inline_comment("\"val # not a comment\""), "\"val # not a comment\"")
+}
+
+test "find_key_sep: finds colon-space" {
+    assert_eq(find_key_sep("key: value"), 3)
+}
+
+test "find_key_sep: key-only colon at end" {
+    assert_eq(find_key_sep("key:"), 3)
+}
+
+test "find_key_sep: url colon ignored" {
+    assert_eq(find_key_sep("url: https://example.com"), 3)
+}
+
+test "find_key_sep: no separator" {
+    assert_eq(find_key_sep("just a value"), -1)
+}
+
+test "convert_flow_seq: empty sequence" {
+    assert_eq(convert_flow_seq("[]"), "[]")
+}
+
+test "convert_flow_seq: int items" {
+    assert_eq(convert_flow_seq("[1, 2, 3]"), "[1, 2, 3]")
+}
+
+test "convert_flow_seq: string items" {
+    assert_eq(convert_flow_seq("[a, b]"), "[\"a\", \"b\"]")
+}
+
+test "convert_flow_map: empty map" {
+    assert_eq(convert_flow_map("\{\}", "elem"), "@elem")
+}
+
+test "convert_flow_map: single pair" {
+    assert_eq(convert_flow_map("\{name: foo\}", "tag"), "@tag(name: \"foo\")")
+}
+
+test "yaml_to_hml: scalar key" {
+    assert_eq(yaml_to_hml("key: value"), "key: \"value\"")
+}
+
+test "yaml_to_hml: integer value" {
+    assert_eq(yaml_to_hml("count: 5"), "count: 5")
+}
+
+test "yaml_to_hml: underscore key converted" {
+    assert_eq(yaml_to_hml("my_key: yes"), "my-key: true")
+}
+
+test "yaml_to_hml: comment converted" {
+    assert_eq(yaml_to_hml("# a note"), "// a note")
+}
+
+test "yaml_to_hml: scalar list" {
+    assert_eq(yaml_to_hml("items:\n  - a\n  - b"), "items: [\"a\", \"b\"]")
+}
+
+test "yaml_to_hml: nested object becomes element block" {
+    assert_eq(
+        yaml_to_hml("parent:\n  child: value"),
+        "@parent \{\n    child: \"value\"\n\}"
+    )
+}
+
+test "yaml_to_hml: list of objects becomes repeated elements" {
+    assert_eq(
+        yaml_to_hml("users:\n  - name: alice\n    age: 30\n  - name: bob\n    age: 25"),
+        "@users \{\n    name: \"alice\"\n    age: 30\n\}\n@users \{\n    name: \"bob\"\n    age: 25\n\}"
+    )
+}
+
+test "yaml_to_hml: flow map becomes inline element" {
+    assert_eq(
+        yaml_to_hml("item: \{name: foo, enabled: yes\}"),
+        "@item(name: \"foo\", enabled: true)"
+    )
+}
+
+test "yaml_to_hml: block scalar becomes triple quoted string" {
+    assert_eq(
+        yaml_to_hml("desc: |\n  hello\n  world"),
+        "desc: \"\"\"\nhello\nworld\n\"\"\""
+    )
 }

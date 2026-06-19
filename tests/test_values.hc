@@ -337,7 +337,7 @@ test "comment-only input" {
 // ============================================================
 
 test "backspace escape" {
-  let input = "x: \"a" + char_to_string(chr(92)) + "bb\""
+  let input = join(["x: \"a", char_to_string(chr(92)), "bb\""], "")
   match hml_parse(input) {
     Ok(nodes) => {
       match at(nodes, "x") |> as_str {
@@ -353,7 +353,7 @@ test "backspace escape" {
 }
 
 test "formfeed escape" {
-  let input = "x: \"a" + char_to_string(chr(92)) + "fb\""
+  let input = join(["x: \"a", char_to_string(chr(92)), "fb\""], "")
   match hml_parse(input) {
     Ok(nodes) => {
       match at(nodes, "x") |> as_str {

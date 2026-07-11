@@ -132,22 +132,10 @@ pub fun at(nodes: list<HmlNode>, key: string) : maybe<Hml> =>
 pub fun elem_at(nodes: list<HmlNode>, name: string) : maybe<Hml> =>
   hml_elem(nodes, name)
 
-pub fun as_str(v: maybe<Hml>) : maybe<string> => match v {
-  Some(h) => hml_str(h),
-  None => None
-}
+pub fun as_str(v: maybe<Hml>) : maybe<string> => v |> and_then(hml_str)
 
-pub fun as_int(v: maybe<Hml>) : maybe<int> => match v {
-  Some(h) => hml_int(h),
-  None => None
-}
+pub fun as_int(v: maybe<Hml>) : maybe<int> => v |> and_then(hml_int)
 
-pub fun as_bool(v: maybe<Hml>) : maybe<bool> => match v {
-  Some(h) => hml_bool(h),
-  None => None
-}
+pub fun as_bool(v: maybe<Hml>) : maybe<bool> => v |> and_then(hml_bool)
 
-pub fun as_datetime(v: maybe<Hml>) : maybe<string> => match v {
-  Some(h) => hml_datetime(h),
-  None => None
-}
+pub fun as_datetime(v: maybe<Hml>) : maybe<string> => v |> and_then(hml_datetime)

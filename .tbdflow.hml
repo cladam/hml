@@ -1,5 +1,5 @@
 main-branch-name: "main"
-release-url-template: "https://github.com/owner/repository/releases/tag/{{version}}"
+release-url-template: "https://github.com/cladam/hml/releases/tag/{{version}}"
 stale-branch-threshold-days: 1
 @monorepo {
     enabled: false

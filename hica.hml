@@ -4,3 +4,13 @@
     license: "MIT"
     entry: "src/main.hc"
 }
+
+@dependencies {
+}
+
+@description {
+    summary: "HML parser in hica"
+    author: "cladam"
+    homepage: "https://www.hica.dev"
+    repository: "https://github.com/cladam/hml"
+}

@@ -20,16 +20,19 @@ of TOML/YAML. See [HML-Specification](https://www.hica.dev/docs/HML-specificatio
 
 ## Installation
 
-Add as a git submodule to your hica project:
+### 1. Add the package
 
 ```sh
-git submodule add https://github.com/cladam/hml.git lib/hml
+hica add hml
+hica fetch
 ```
 
-Then import the library:
+This records the dependency in `hica.hml` and downloads the package.
+
+### 2. Import
 
 ```hica
-import "./lib/hml/src/hml"
+import "hml"
 ```
 
 ## Quick Example

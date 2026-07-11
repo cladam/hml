@@ -27,14 +27,11 @@ pub fun is_bare_key_char(c: string) : bool =>
 pub fun is_hex_char(c: string) : bool =>
   c != "" && contains("0123456789abcdefABCDEF", c)
 
-pub fun hex_digit_val(c: string) : int {
-  if c == "0" { 0 } else if c == "1" { 1 } else if c == "2" { 2 }
-  else if c == "3" { 3 } else if c == "4" { 4 } else if c == "5" { 5 }
-  else if c == "6" { 6 } else if c == "7" { 7 } else if c == "8" { 8 }
-  else if c == "9" { 9 } else if c == "a" || c == "A" { 10 }
-  else if c == "b" || c == "B" { 11 } else if c == "c" || c == "C" { 12 }
-  else if c == "d" || c == "D" { 13 } else if c == "e" || c == "E" { 14 }
-  else { 15 }
+pub fun hex_digit_val(c: string) : int => match c {
+  "0" => 0, "1" => 1, "2" => 2, "3" => 3, "4" => 4,
+  "5" => 5, "6" => 6, "7" => 7, "8" => 8, "9" => 9,
+  "a" | "A" => 10, "b" | "B" => 11, "c" | "C" => 12,
+  "d" | "D" => 13, "e" | "E" => 14, _ => 15
 }
 
 pub fun parse_hex_digits(s: string, pos: int, n: int, acc: int) : result<(int, int), string> {
@@ -190,19 +187,19 @@ pub fun parse_escape_u8(s: string, pos: int, acc: string) : result<(string, int)
   }
 }
 
-pub fun parse_escape(s: string, pos: int, acc: string) : result<(string, int), string> {
-  let next = peek(s, pos + 1)
-  if next == "n" { parse_basic_string(s, pos + 2, acc + "\n") }
-  else if next == "t" { parse_basic_string(s, pos + 2, acc + "\t") }
-  else if next == "r" { parse_basic_string(s, pos + 2, acc + "\r") }
-  else if next == "b" { parse_basic_string(s, pos + 2, acc + char_to_string(chr(8))) }
-  else if next == "f" { parse_basic_string(s, pos + 2, acc + char_to_string(chr(12))) }
-  else if next == "\\" { parse_basic_string(s, pos + 2, acc + "\\") }
-  else if next == "\"" { parse_basic_string(s, pos + 2, acc + "\"") }
-  else if next == "u" { parse_escape_u4(s, pos, acc) }
-  else if next == "U" { parse_escape_u8(s, pos, acc) }
-  else { Err("unknown escape: \\" + next) }
-}
+pub fun parse_escape(s: string, pos: int, acc: string) : result<(string, int), string> =>
+  match peek(s, pos + 1) {
+    "n"  => parse_basic_string(s, pos + 2, acc + "\n"),
+    "t"  => parse_basic_string(s, pos + 2, acc + "\t"),
+    "r"  => parse_basic_string(s, pos + 2, acc + "\r"),
+    "b"  => parse_basic_string(s, pos + 2, acc + char_to_string(chr(8))),
+    "f"  => parse_basic_string(s, pos + 2, acc + char_to_string(chr(12))),
+    "\\" => parse_basic_string(s, pos + 2, acc + "\\"),
+    "\"" => parse_basic_string(s, pos + 2, acc + "\""),
+    "u"  => parse_escape_u4(s, pos, acc),
+    "U"  => parse_escape_u8(s, pos, acc),
+    next => Err("unknown escape: \\" + next)
+  }
 
 pub fun parse_basic_string(s: string, pos: int, acc: string) : result<(string, int), string> {
   if pos >= str_length(s) { Err("unterminated string") }
@@ -263,14 +260,18 @@ pub fun parse_int_digits(s: string, pos: int, acc: string) : (string, int) {
 }
 
 pub fun is_duration_unit(s: string, pos: int) : maybe<(string, int)> {
-  if pos + 1 < str_length(s) && peek(s, pos) == "n" && peek(s, pos + 1) == "s" { Some(("ns", pos + 2)) }
-  else if pos + 1 < str_length(s) && peek(s, pos) == "u" && peek(s, pos + 1) == "s" { Some(("us", pos + 2)) }
-  else if pos + 1 < str_length(s) && peek(s, pos) == "m" && peek(s, pos + 1) == "s" { Some(("ms", pos + 2)) }
-  else if peek(s, pos) == "s" { Some(("s", pos + 1)) }
-  else if peek(s, pos) == "m" { Some(("m", pos + 1)) }
-  else if peek(s, pos) == "h" { Some(("h", pos + 1)) }
-  else if peek(s, pos) == "d" { Some(("d", pos + 1)) }
-  else { None }
+  let c0 = peek(s, pos)
+  let c1 = peek(s, pos + 1)
+  match c0 {
+    "n" if c1 == "s" => Some(("ns", pos + 2)),
+    "u" if c1 == "s" => Some(("us", pos + 2)),
+    "m" if c1 == "s" => Some(("ms", pos + 2)),
+    "s" => Some(("s", pos + 1)),
+    "m" => Some(("m", pos + 1)),
+    "h" => Some(("h", pos + 1)),
+    "d" => Some(("d", pos + 1)),
+    _   => None
+  }
 }
 
 // ============================================================
@@ -512,15 +513,17 @@ pub fun parse_ml_basic_escape(s: string, pos: int, acc: string) : result<(Hml, i
   if pos + 1 >= str_length(s) { Err("unterminated escape in multi-line string") }
   else {
     let next = peek(s, pos + 1)
-    if next == "n" { parse_ml_basic_body(s, pos + 2, acc + "\n") }
-    else if next == "t" { parse_ml_basic_body(s, pos + 2, acc + "\t") }
-    else if next == "r" { parse_ml_basic_body(s, pos + 2, acc + "\r") }
-    else if next == "b" { parse_ml_basic_body(s, pos + 2, acc + char_to_string(chr(8))) }
-    else if next == "f" { parse_ml_basic_body(s, pos + 2, acc + char_to_string(chr(12))) }
-    else if next == "\\" { parse_ml_basic_body(s, pos + 2, acc + "\\") }
-    else if next == "\"" { parse_ml_basic_body(s, pos + 2, acc + "\"") }
-    else if is_newline(next) { parse_ml_basic_body(s, skip_ws_and_newlines(s, pos + 1), acc) }
-    else { parse_ml_basic_body(s, pos + 2, acc + "\\" + next) }
+    match next {
+      "n"  => parse_ml_basic_body(s, pos + 2, acc + "\n"),
+      "t"  => parse_ml_basic_body(s, pos + 2, acc + "\t"),
+      "r"  => parse_ml_basic_body(s, pos + 2, acc + "\r"),
+      "b"  => parse_ml_basic_body(s, pos + 2, acc + char_to_string(chr(8))),
+      "f"  => parse_ml_basic_body(s, pos + 2, acc + char_to_string(chr(12))),
+      "\\" => parse_ml_basic_body(s, pos + 2, acc + "\\"),
+      "\"" => parse_ml_basic_body(s, pos + 2, acc + "\""),
+      c if is_newline(c) => parse_ml_basic_body(s, skip_ws_and_newlines(s, pos + 1), acc),
+      _ => parse_ml_basic_body(s, pos + 2, acc + "\\" + next)
+    }
   }
 }
 

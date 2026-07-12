@@ -102,21 +102,17 @@ pub fun hml_ok(r: result<list<HmlNode>, string>) : maybe<list<HmlNode>> => match
   Err(_) => None
 }
 
-pub fun hml_texts(nodes: list<HmlNode>) : list<string> {
-  match nodes {
-    [] => [],
-    [NText(content), ..rest] => [content] + hml_texts(rest),
-    [_, ..rest] => hml_texts(rest)
-  }
-}
+pub fun hml_texts(nodes: list<HmlNode>) : list<string> =>
+  flat_map(nodes, (node) => match node {
+    NText(content) => [content],
+    _ => []
+  })
 
-pub fun hml_namespaces(nodes: list<HmlNode>) : list<(string, string)> {
-  match nodes {
-    [] => [],
-    [NNamespace(pfx, uri), ..rest] => [(pfx, uri)] + hml_namespaces(rest),
-    [_, ..rest] => hml_namespaces(rest)
-  }
-}
+pub fun hml_namespaces(nodes: list<HmlNode>) : list<(string, string)> =>
+  flat_map(nodes, (node) => match node {
+    NNamespace(pfx, uri) => [(pfx, uri)],
+    _ => []
+  })
 
 pub fun hml_namespace(nodes: list<HmlNode>, pfx: string) : maybe<string> {
   match nodes {

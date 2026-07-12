@@ -220,18 +220,12 @@ pub fun parse_key(s: string, pos: int) : result<(string, int), string> {
 }
 
 pub fun parse_key_path(s: string, pos: int) : result<(list<string>, int), string> {
-  match parse_key(s, pos) {
-    Ok((key, p2)) => {
-      if peek(s, p2) == "." {
-        match parse_key_path(s, p2 + 1) {
-          Ok((rest, p3)) => Ok(([key] + rest, p3)),
-          Err(e) => Err(e)
-        }
-      }
-      else { Ok(([key], p2)) }
-    },
-    Err(e) => Err(e)
+  let (key, p2) = parse_key(s, pos)?
+  if peek(s, p2) == "." {
+    let (rest, p3) = parse_key_path(s, p2 + 1)?
+    Ok(([key] + rest, p3))
   }
+  else { Ok(([key], p2)) }
 }
 
 pub fun wrap_dotted_value(segments: list<string>, val: Hml) : HmlNode {

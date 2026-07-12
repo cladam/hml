@@ -25,9 +25,9 @@ pub fun show_element(name: string, attrs: list<(string, Hml)>, body: list<HmlNod
   "@" + name + attr_str + body_str
 }
 
-pub fun show_attr(entry: (string, Hml)) : string => match entry.1 {
-  HBool(true) => entry.0,
-  _ => entry.0 + ": " + hml_show(entry.1)
+pub fun show_attr(entry: (string, Hml)) : string => match entry {
+  (k, HBool(true)) => k,
+  (k, v) => k + ": " + hml_show(v)
 }
 
 // ============================================================

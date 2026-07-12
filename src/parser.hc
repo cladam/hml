@@ -174,17 +174,13 @@ pub fun parse_bare_key(s: string, pos: int, acc: string) : result<(string, int),
 }
 
 pub fun parse_escape_u4(s: string, pos: int, acc: string) : result<(string, int), string> {
-  match parse_hex_digits(s, pos + 2, 4, 0) {
-    Ok((cp, p2)) => parse_basic_string(s, p2, acc + char_to_string(chr(cp))),
-    Err(e) => Err(e)
-  }
+  let (cp, p2) = parse_hex_digits(s, pos + 2, 4, 0)?
+  parse_basic_string(s, p2, acc + char_to_string(chr(cp)))
 }
 
 pub fun parse_escape_u8(s: string, pos: int, acc: string) : result<(string, int), string> {
-  match parse_hex_digits(s, pos + 2, 8, 0) {
-    Ok((cp, p2)) => parse_basic_string(s, p2, acc + char_to_string(chr(cp))),
-    Err(e) => Err(e)
-  }
+  let (cp, p2) = parse_hex_digits(s, pos + 2, 8, 0)?
+  parse_basic_string(s, p2, acc + char_to_string(chr(cp)))
 }
 
 pub fun parse_escape(s: string, pos: int, acc: string) : result<(string, int), string> =>

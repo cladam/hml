@@ -60,8 +60,6 @@ jobs:
           tar czf "/tmp/$TARBALL" \
             --exclude='.git' \
             --exclude='.koka' \
-            --exclude='*.kk' \
-            --exclude='*.kki' \
             --exclude='.hica' \
             --exclude='node_modules' \
             --exclude='*.tar.gz' \

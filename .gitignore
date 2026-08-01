@@ -6,6 +6,8 @@ examples/*
 
 src/*
 !src/*.hc
+!src/*.kk
+!src/*.kki
 
 tests/*
 !tests/*.hc

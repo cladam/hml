@@ -27,37 +27,37 @@ fun hc-show-result(r, show-a, show-e)
     Right(x) -> "Ok(" ++ show-a(x) ++ ")"
     Left(e)  -> "Err(" ++ show-e(e) ++ ")"
 
-fun hc_abs(n : int)
+noinline fun hc_abs(n : int)
   if (n < 0) then (0 - n) else n
 
-fun hc_min(a : int, b : int)
+noinline fun hc_min(a : int, b : int)
   if (a < b) then a else b
 
-fun hc_max(a : int, b : int)
+noinline fun hc_max(a : int, b : int)
   if (a > b) then a else b
 
-fun hc_clamp(v : int, lo : int, hi : int)
+noinline fun hc_clamp(v : int, lo : int, hi : int)
   hc_min(hc_max(v, lo), hi)
 
-fun hc_gcd(a : int, b : int)
+noinline fun hc_gcd(a : int, b : int)
   if (b == 0) then a else hc_gcd(b, (a % b))
 
-fun hc_lcm(a : int, b : int)
+noinline fun hc_lcm(a : int, b : int)
   if ((a == 0) || (b == 0)) then 0 else (hc_abs((a * b)) / hc_gcd(a, b))
 
-fun hc_pow(base : int, exp : int)
+noinline fun hc_pow(base : int, exp : int)
   if (exp <= 0) then 1 else (base * hc_pow(base, (exp - 1)))
 
-fun hc_sign(n : int) : int
+noinline fun hc_sign(n : int) : int
   if (n > 0) then 1 else if (n < 0) then (0 - 1) else 0
 
-fun hc_range(lo : int, hi : int)
+noinline fun hc_range(lo : int, hi : int)
   if (lo >= hi) then [] else ([lo] ++ hc_range((lo + 1), hi))
 
-fun hc_range_inc(lo : int, hi : int)
+noinline fun hc_range_inc(lo : int, hi : int)
   if (lo > hi) then [] else ([lo] ++ hc_range_inc((lo + 1), hi))
 
-fun hc_isqrt(n : int)
+noinline fun hc_isqrt(n : int)
   if (n <= 0) then
     0
   else
@@ -66,55 +66,55 @@ fun hc_isqrt(n : int)
     val result : int = hc_isqrt_loop(n, x0, x1)
     result
 
-fun hc_isqrt_loop(n : int, x0 : int, x1 : int)
+noinline fun hc_isqrt_loop(n : int, x0 : int, x1 : int)
   if (x1 >= x0) then
     x0
   else
     val x2 : int = ((x1 + (n / x1)) / 2)
     hc_isqrt_loop(n, x1, x2)
 
-fun hc_is_digit(c : char) : bool
+noinline fun hc_is_digit(c : char) : bool
   val n : int = c.int
   ((n >= 48) && (n <= 57))
 
-fun hc_is_upper(c : char) : bool
+noinline fun hc_is_upper(c : char) : bool
   val n : int = c.int
   ((n >= 65) && (n <= 90))
 
-fun hc_is_lower(c : char) : bool
+noinline fun hc_is_lower(c : char) : bool
   val n : int = c.int
   ((n >= 97) && (n <= 122))
 
-fun hc_is_alpha(c : char) : bool
+noinline fun hc_is_alpha(c : char) : bool
   (hc_is_upper(c) || hc_is_lower(c))
 
-fun hc_is_alnum(c : char) : bool
+noinline fun hc_is_alnum(c : char) : bool
   (hc_is_alpha(c) || hc_is_digit(c))
 
-fun hc_is_space(c : char) : bool
+noinline fun hc_is_space(c : char) : bool
   val n : int = c.int
   ((((n == 32) || (n == 9)) || (n == 10)) || (n == 13))
 
-fun hc_is_punct(c : char) : bool
+noinline fun hc_is_punct(c : char) : bool
   val n : int = c.int
   (((((n >= 33) && (n <= 47)) || ((n >= 58) && (n <= 64))) || ((n >= 91) && (n <= 96))) || ((n >= 123) && (n <= 126)))
 
-fun hc_all_digits(s : string) : bool
+noinline fun hc_all_digits(s : string) : bool
   if (s.count == 0) then False else all(s.string/list, hc_is_digit)
 
-fun hc_all_alpha(s : string) : bool
+noinline fun hc_all_alpha(s : string) : bool
   if (s.count == 0) then False else all(s.string/list, hc_is_alpha)
 
-fun hc_all_upper(s : string) : bool
+noinline fun hc_all_upper(s : string) : bool
   if (s.count == 0) then False else all(s.string/list, hc_is_upper)
 
-fun hc_all_lower(s : string) : bool
+noinline fun hc_all_lower(s : string) : bool
   if (s.count == 0) then False else all(s.string/list, hc_is_lower)
 
-fun hc_all_alnum(s : string) : bool
+noinline fun hc_all_alnum(s : string) : bool
   if (s.count == 0) then False else all(s.string/list, hc_is_alnum)
 
-fun hc_glob_match_chars(pat : list<char>, input : list<char>)
+noinline fun hc_glob_match_chars(pat : list<char>, input : list<char>)
   match pat
     Nil ->
       match input
@@ -143,7 +143,7 @@ fun hc_glob_match_chars(pat : list<char>, input : list<char>)
             Cons(c, irest) ->
               if (p == c) then hc_glob_match_chars(prest, irest) else False
 
-fun hc_glob_star(prest : list<char>, input : list<char>)
+noinline fun hc_glob_star(prest : list<char>, input : list<char>)
   if hc_glob_match_chars(prest, input) then
     True
   else
@@ -153,15 +153,15 @@ fun hc_glob_star(prest : list<char>, input : list<char>)
       Cons(c, irest) ->
         if (c.string == "/") then False else hc_glob_star(prest, irest)
 
-fun hc_glob_match(pattern : string, s : string)
+noinline fun hc_glob_match(pattern : string, s : string)
   hc_glob_match_chars(pattern.string/list, s.string/list)
 
-fun hc_glob_match_path(pattern : string, hc_path : string)
+noinline fun hc_glob_match_path(pattern : string, hc_path : string)
   val pat_parts : list<string> = (fn(hc__s: string, hc__sep: string) if hc__sep.is-empty then hc__s.list.map(fn(c) c.string) else hc__s.split(hc__sep))(pattern, "/")
   val path_parts : list<string> = (fn(hc__s: string, hc__sep: string) if hc__sep.is-empty then hc__s.list.map(fn(c) c.string) else hc__s.split(hc__sep))(hc_path, "/")
   hc_glob_match_segments(pat_parts, path_parts)
 
-fun hc_glob_match_segments(pats : list<string>, paths : list<string>)
+noinline fun hc_glob_match_segments(pats : list<string>, paths : list<string>)
   match pats
     Nil ->
       match paths
@@ -179,7 +179,7 @@ fun hc_glob_match_segments(pats : list<string>, paths : list<string>)
           Cons(s, srest) ->
             if hc_glob_match(p, s) then hc_glob_match_segments(prest, srest) else False
 
-fun hc_glob_doublestar(prest : list<string>, paths : list<string>)
+noinline fun hc_glob_doublestar(prest : list<string>, paths : list<string>)
   if hc_glob_match_segments(prest, paths) then
     True
   else
@@ -189,72 +189,72 @@ fun hc_glob_doublestar(prest : list<string>, paths : list<string>)
       Cons(_, srest) ->
         hc_glob_doublestar(prest, srest)
 
-fun hc_is_empty(s : string)
+noinline fun hc_is_empty(s : string)
   (s.count == 0)
 
-fun hc_is_blank(s : string)
+noinline fun hc_is_blank(s : string)
   hc_is_empty(s.trim)
 
-fun hc_words(s : string)
+noinline fun hc_words(s : string)
   filter((fn(hc__s: string, hc__sep: string) if hc__sep.is-empty then hc__s.list.map(fn(c) c.string) else hc__s.split(hc__sep))(s, " "), fn(w) !(hc_is_empty(w)))
 
-fun hc_lines(s : string)
+noinline fun hc_lines(s : string)
   (fn(hc__s: string, hc__sep: string) if hc__sep.is-empty then hc__s.list.map(fn(c) c.string) else hc__s.split(hc__sep))(s, "\n")
 
-fun hc_unwords(ws : list<string>)
+noinline fun hc_unwords(ws : list<string>)
   ws.join(" ")
 
-fun hc_unlines(ls : list<string>)
+noinline fun hc_unlines(ls : list<string>)
   ls.join("\n")
 
-fun hc_repeat_str(s : string, n : int)
+noinline fun hc_repeat_str(s : string, n : int)
   if (n <= 0) then "" else (s ++ hc_repeat_str(s, (n - 1)))
 
-fun hc_pad_left(s : string, width : int, ch : string)
+noinline fun hc_pad_left(s : string, width : int, ch : string)
   (hc_repeat_str(ch, hc_max(0, (width - s.count))) ++ s)
 
-fun hc_pad_right(s : string, width : int, ch : string)
+noinline fun hc_pad_right(s : string, width : int, ch : string)
   (s ++ hc_repeat_str(ch, hc_max(0, (width - s.count))))
 
-fun hc_center(s : string, width : int, ch : string)
+noinline fun hc_center(s : string, width : int, ch : string)
   val total : int = hc_max(0, (width - s.count))
   val left : int = (total / 2)
   val right : int = (total - left)
   ((hc_repeat_str(ch, left) ++ s) ++ hc_repeat_str(ch, right))
 
-fun hc_removeprefix(s : string, pre : string) : string
+noinline fun hc_removeprefix(s : string, pre : string) : string
   if s.starts-with(pre).is-just then s.list.drop(pre.count).string else s
 
 // .hc:6
-fun hc_peek(s : string, pos : int) : string
+noinline fun hc_peek(s : string, pos : int) : string
   if (pos >= s.count) then "" else s.list.drop(pos).take(((pos + 1)) - (pos)).string
 
 // .hc:10
-fun hc_is_ws(c : string) : bool
+noinline fun hc_is_ws(c : string) : bool
   ((c == " ") || (c == "\t"))
 
 // .hc:13
-fun hc_is_newline(c : string) : bool
+noinline fun hc_is_newline(c : string) : bool
   ((c == "\n") || (c == "\r"))
 
 // .hc:16
-fun hc_hml_is_digit(c : string) : bool
+noinline fun hc_hml_is_digit(c : string) : bool
   ((c != "") && "0123456789".contains(c))
 
 // .hc:19
-fun hc_hml_is_alpha(c : string) : bool
+noinline fun hc_hml_is_alpha(c : string) : bool
   ((c != "") && "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".contains(c))
 
 // .hc:22
-fun hc_is_bare_key_char(c : string) : bool
+noinline fun hc_is_bare_key_char(c : string) : bool
   (((hc_hml_is_alpha(c) || hc_hml_is_digit(c)) || (c == "-")) || (c == "_"))
 
 // .hc:25
-fun hc_is_hex_char(c : string) : bool
+noinline fun hc_is_hex_char(c : string) : bool
   ((c != "") && "0123456789abcdefABCDEF".contains(c))
 
 // .hc:28
-fun hc_hex_digit_val(c : string) : int
+noinline fun hc_hex_digit_val(c : string) : int
   match c
     "0" ->
       0
@@ -300,7 +300,7 @@ fun hc_hex_digit_val(c : string) : int
       15
 
 // .hc:34
-fun hc_parse_hex_digits(s : string, pos : int, n : int, acc : int)
+noinline fun hc_parse_hex_digits(s : string, pos : int, n : int, acc : int)
   if (n == 0) then
     Right((acc, pos))
   else if (pos >= s.count) then
@@ -311,15 +311,15 @@ fun hc_parse_hex_digits(s : string, pos : int, n : int, acc : int)
     Left(("invalid hex digit in unicode escape: " ++ hc_peek(s, pos)))
 
 // .hc:48
-fun hc_is_octal_char(c : string) : bool
+noinline fun hc_is_octal_char(c : string) : bool
   ((c != "") && "01234567".contains(c))
 
 // .hc:51
-fun hc_is_binary_char(c : string) : bool
+noinline fun hc_is_binary_char(c : string) : bool
   ((c == "0") || (c == "1"))
 
 // .hc:54
-fun hc_parse_hex_int_digits(s : string, pos : int, acc : int)
+noinline fun hc_parse_hex_int_digits(s : string, pos : int, acc : int)
   if ((pos >= s.count) || !(hc_is_hex_char(hc_peek(s, pos)))) then
     if (((hc_peek(s, pos) == "_") && ((pos + 1) < s.count)) && hc_is_hex_char(hc_peek(s, (pos + 1)))) then hc_parse_hex_int_digits(s, (pos + 1), acc) else (acc, pos, 0)
   else
@@ -327,7 +327,7 @@ fun hc_parse_hex_int_digits(s : string, pos : int, acc : int)
     (hc_val, p2, (cnt + 1))
 
 // .hc:66
-fun hc_parse_hex_int(s : string, pos : int, hc_sign : string)
+noinline fun hc_parse_hex_int(s : string, pos : int, hc_sign : string)
   val (hc_val, p2, cnt) = hc_parse_hex_int_digits(s, pos, 0)
   if (cnt == 0) then
     Left(("expected hex digits after 0x at position " ++ show(pos)))
@@ -336,7 +336,7 @@ fun hc_parse_hex_int(s : string, pos : int, hc_sign : string)
     Right((HInt(result), p2))
 
 // .hc:75
-fun hc_parse_octal_int_digits(s : string, pos : int, acc : int)
+noinline fun hc_parse_octal_int_digits(s : string, pos : int, acc : int)
   if ((pos >= s.count) || !(hc_is_octal_char(hc_peek(s, pos)))) then
     if (((hc_peek(s, pos) == "_") && ((pos + 1) < s.count)) && hc_is_octal_char(hc_peek(s, (pos + 1)))) then hc_parse_octal_int_digits(s, (pos + 1), acc) else (acc, pos, 0)
   else
@@ -345,7 +345,7 @@ fun hc_parse_octal_int_digits(s : string, pos : int, acc : int)
     (hc_val, p2, (cnt + 1))
 
 // .hc:89
-fun hc_parse_octal_int(s : string, pos : int, hc_sign : string)
+noinline fun hc_parse_octal_int(s : string, pos : int, hc_sign : string)
   val (hc_val, p2, cnt) = hc_parse_octal_int_digits(s, pos, 0)
   if (cnt == 0) then
     Left(("expected octal digits after 0o at position " ++ show(pos)))
@@ -354,7 +354,7 @@ fun hc_parse_octal_int(s : string, pos : int, hc_sign : string)
     Right((HInt(result), p2))
 
 // .hc:98
-fun hc_parse_binary_int_digits(s : string, pos : int, acc : int)
+noinline fun hc_parse_binary_int_digits(s : string, pos : int, acc : int)
   if ((pos >= s.count) || !(hc_is_binary_char(hc_peek(s, pos)))) then
     if (((hc_peek(s, pos) == "_") && ((pos + 1) < s.count)) && hc_is_binary_char(hc_peek(s, (pos + 1)))) then hc_parse_binary_int_digits(s, (pos + 1), acc) else (acc, pos, 0)
   else
@@ -363,7 +363,7 @@ fun hc_parse_binary_int_digits(s : string, pos : int, acc : int)
     (hc_val, p2, (cnt + 1))
 
 // .hc:112
-fun hc_parse_binary_int(s : string, pos : int, hc_sign : string)
+noinline fun hc_parse_binary_int(s : string, pos : int, hc_sign : string)
   val (hc_val, p2, cnt) = hc_parse_binary_int_digits(s, pos, 0)
   if (cnt == 0) then
     Left(("expected binary digits after 0b at position " ++ show(pos)))
@@ -372,23 +372,23 @@ fun hc_parse_binary_int(s : string, pos : int, hc_sign : string)
     Right((HInt(result), p2))
 
 // .hc:127
-fun hc_skip_ws(s : string, pos : int)
+noinline fun hc_skip_ws(s : string, pos : int)
   if (pos >= s.count) then pos else if hc_is_ws(hc_peek(s, pos)) then hc_skip_ws(s, (pos + 1)) else pos
 
 // .hc:132
-fun hc_skip_ws_and_newlines(s : string, pos : int)
+noinline fun hc_skip_ws_and_newlines(s : string, pos : int)
   if (pos >= s.count) then pos else if (hc_is_ws(hc_peek(s, pos)) || hc_is_newline(hc_peek(s, pos))) then hc_skip_ws_and_newlines(s, (pos + 1)) else pos
 
 // .hc:138
-fun hc_skip_to_eol(s : string, pos : int)
+noinline fun hc_skip_to_eol(s : string, pos : int)
   if (pos >= s.count) then pos else if (hc_peek(s, pos) == "\n") then pos else if (hc_peek(s, pos) == "\r") then pos else hc_skip_to_eol(s, (pos + 1))
 
 // .hc:145
-fun hc_skip_comment(s : string, pos : int)
+noinline fun hc_skip_comment(s : string, pos : int)
   if ((((pos + 1) < s.count) && (hc_peek(s, pos) == "/")) && (hc_peek(s, (pos + 1)) == "/")) then hc_skip_to_eol(s, (pos + 2)) else pos
 
 // .hc:152
-fun hc_skip_noise(s : string, pos : int)
+noinline fun hc_skip_noise(s : string, pos : int)
   val p1 : int = hc_skip_ws_and_newlines(s, pos)
   if ((((p1 + 1) < s.count) && (hc_peek(s, p1) == "/")) && (hc_peek(s, (p1 + 1)) == "/")) then
     val p2 : int = hc_skip_to_eol(s, (p1 + 2))
@@ -397,38 +397,38 @@ fun hc_skip_noise(s : string, pos : int)
     p1
 
 // .hc:166
-fun hc_parse_bare_key(s : string, pos : int, acc : string)
+noinline fun hc_parse_bare_key(s : string, pos : int, acc : string)
   if ((pos >= s.count) || !(hc_is_bare_key_char(hc_peek(s, pos)))) then
     if (acc.count == 0) then Left(("expected key at position " ++ show(pos))) else Right((acc, pos))
   else
     hc_parse_bare_key(s, (pos + 1), (acc ++ hc_peek(s, pos)))
 
 // .hc:173
-fun hc_parse_escape_u4__work(s : string, pos : int, acc : string)
+noinline fun hc_parse_escape_u4__work(s : string, pos : int, acc : string)
   val (cp, p2) = match hc_parse_hex_digits(s, (pos + 2), 4, 0)
     Right(hc__v) -> hc__v
     Left(hc__e) -> hica-early-err(hc__e)
   hc_parse_basic_string__work(s, p2, (acc ++ cp.char.string))
 
-fun hc_parse_escape_u4(s : string, pos : int, acc : string)
+noinline fun hc_parse_escape_u4(s : string, pos : int, acc : string)
   with handler
     ctl hica-early-err(e) -> Left(e)
   hc_parse_escape_u4__work(s, pos, acc)
 
 // .hc:178
-fun hc_parse_escape_u8__work(s : string, pos : int, acc : string)
+noinline fun hc_parse_escape_u8__work(s : string, pos : int, acc : string)
   val (cp, p2) = match hc_parse_hex_digits(s, (pos + 2), 8, 0)
     Right(hc__v) -> hc__v
     Left(hc__e) -> hica-early-err(hc__e)
   hc_parse_basic_string__work(s, p2, (acc ++ cp.char.string))
 
-fun hc_parse_escape_u8(s : string, pos : int, acc : string)
+noinline fun hc_parse_escape_u8(s : string, pos : int, acc : string)
   with handler
     ctl hica-early-err(e) -> Left(e)
   hc_parse_escape_u8__work(s, pos, acc)
 
 // .hc:183
-fun hc_parse_escape__work(s : string, pos : int, acc : string)
+noinline fun hc_parse_escape__work(s : string, pos : int, acc : string)
   match hc_peek(s, (pos + 1))
     "n" ->
       hc_parse_basic_string__work(s, (pos + 2), (acc ++ "\n"))
@@ -451,34 +451,34 @@ fun hc_parse_escape__work(s : string, pos : int, acc : string)
     next ->
       Left(("unknown escape: \\" ++ next))
 
-fun hc_parse_escape(s : string, pos : int, acc : string)
+noinline fun hc_parse_escape(s : string, pos : int, acc : string)
   with handler
     ctl hica-early-err(e) -> Left(e)
   hc_parse_escape__work(s, pos, acc)
 
 // .hc:197
-fun hc_parse_basic_string__work(s : string, pos : int, acc : string)
+noinline fun hc_parse_basic_string__work(s : string, pos : int, acc : string)
   if (pos >= s.count) then
     Left("unterminated string")
   else if (hc_peek(s, pos) == "\"") then
     Right((acc, (pos + 1)))
   else if (hc_peek(s, pos) == "\\") then if ((pos + 1) >= s.count) then Left("unterminated escape") else hc_parse_escape__work(s, pos, acc) else hc_parse_basic_string__work(s, (pos + 1), (acc ++ hc_peek(s, pos)))
 
-fun hc_parse_basic_string(s : string, pos : int, acc : string)
+noinline fun hc_parse_basic_string(s : string, pos : int, acc : string)
   with handler
     ctl hica-early-err(e) -> Left(e)
   hc_parse_basic_string__work(s, pos, acc)
 
 // .hc:207
-fun hc_parse_literal_string(s : string, pos : int, acc : string)
+noinline fun hc_parse_literal_string(s : string, pos : int, acc : string)
   if (pos >= s.count) then Left("unterminated literal string") else if (hc_peek(s, pos) == "\'") then Right((acc, (pos + 1))) else hc_parse_literal_string(s, (pos + 1), (acc ++ hc_peek(s, pos)))
 
 // .hc:213
-fun hc_parse_key(s : string, pos : int)
+noinline fun hc_parse_key(s : string, pos : int)
   if (hc_peek(s, pos) == "\"") then hc_parse_basic_string(s, (pos + 1), "") else if (hc_peek(s, pos) == "\'") then hc_parse_literal_string(s, (pos + 1), "") else hc_parse_bare_key(s, pos, "")
 
 // .hc:219
-fun hc_parse_key_path__work(s : string, pos : int)
+noinline fun hc_parse_key_path__work(s : string, pos : int)
   val (key, p2) = match hc_parse_key(s, pos)
     Right(hc__v) -> hc__v
     Left(hc__e) -> hica-early-err(hc__e)
@@ -490,13 +490,13 @@ fun hc_parse_key_path__work(s : string, pos : int)
   else
     Right(([key], p2))
 
-fun hc_parse_key_path(s : string, pos : int)
+noinline fun hc_parse_key_path(s : string, pos : int)
   with handler
     ctl hica-early-err(e) -> Left(e)
   hc_parse_key_path__work(s, pos)
 
 // .hc:228
-fun hc_wrap_dotted_value(segments : list<string>, hc_val : hml)
+noinline fun hc_wrap_dotted_value(segments : list<string>, hc_val : hml)
   match segments
     Cons(k, Nil) ->
       NProp(k, hc_val)
@@ -506,7 +506,7 @@ fun hc_wrap_dotted_value(segments : list<string>, hc_val : hml)
       NProp("", hc_val)
 
 // .hc:241
-fun hc_parse_int_digits(s : string, pos : int, acc : string)
+noinline fun hc_parse_int_digits(s : string, pos : int, acc : string)
   if (pos >= s.count) then
     (acc, pos)
   else if hc_hml_is_digit(hc_peek(s, pos)) then
@@ -514,7 +514,7 @@ fun hc_parse_int_digits(s : string, pos : int, acc : string)
   else if (((hc_peek(s, pos) == "_") && ((pos + 1) < s.count)) && hc_hml_is_digit(hc_peek(s, (pos + 1)))) then hc_parse_int_digits(s, (pos + 1), acc) else (acc, pos)
 
 // .hc:247
-fun hc_is_duration_unit(s : string, pos : int) : maybe<(string, int)>
+noinline fun hc_is_duration_unit(s : string, pos : int) : maybe<(string, int)>
   val c0 : string = hc_peek(s, pos)
   val c1 : string = hc_peek(s, (pos + 1))
   match c0
@@ -536,16 +536,16 @@ fun hc_is_duration_unit(s : string, pos : int) : maybe<(string, int)>
       Nothing
 
 // .hc:269
-fun hc_validated_datetime(dt_str : string, pos : int) : either<string, (hml, int)>
+noinline fun hc_validated_datetime(dt_str : string, pos : int) : either<string, (hml, int)>
   Right((HDatetime(dt_str), pos))
 
 // .hc:271
-fun hc_finish_time_frac(s : string, pos : int, time_str : string)
+noinline fun hc_finish_time_frac(s : string, pos : int, time_str : string)
   val (f, p2) = hc_parse_int_digits(s, pos, "")
   hc_validated_datetime(((time_str ++ ".") ++ f), p2)
 
 // .hc:277
-fun hc_try_parse_time(s : string, pos : int, hour : string)
+noinline fun hc_try_parse_time(s : string, pos : int, hour : string)
   if ((pos + 6) > s.count) then
     Left("incomplete time")
   else if ((((!(hc_hml_is_digit(hc_peek(s, (pos + 1)))) || !(hc_hml_is_digit(hc_peek(s, (pos + 2))))) || (hc_peek(s, (pos + 3)) != ":")) || !(hc_hml_is_digit(hc_peek(s, (pos + 4))))) || !(hc_hml_is_digit(hc_peek(s, (pos + 5))))) then
@@ -555,7 +555,7 @@ fun hc_try_parse_time(s : string, pos : int, hour : string)
     if (hc_peek(s, (pos + 6)) == ".") then hc_finish_time_frac(s, (pos + 7), time_str) else hc_validated_datetime(time_str, (pos + 6))
 
 // .hc:289
-fun hc_try_parse_tz_offset(s : string, pos : int, dt_prefix : string) : either<string, (hml, int)>
+noinline fun hc_try_parse_tz_offset(s : string, pos : int, dt_prefix : string) : either<string, (hml, int)>
   val hc_sign : string = hc_peek(s, pos)
   if ((pos + 6) > s.count) then
     Left("incomplete timezone offset")
@@ -565,22 +565,22 @@ fun hc_try_parse_tz_offset(s : string, pos : int, dt_prefix : string) : either<s
     hc_validated_datetime(((((((dt_prefix ++ hc_sign) ++ hc_peek(s, (pos + 1))) ++ hc_peek(s, (pos + 2))) ++ ":") ++ hc_peek(s, (pos + 4))) ++ hc_peek(s, (pos + 5))), (pos + 6))
 
 // .hc:300
-fun hc_parse_datetime_offset(s : string, pos : int, date_str : string, time_str : string) : either<string, (hml, int)>
+noinline fun hc_parse_datetime_offset(s : string, pos : int, date_str : string, time_str : string) : either<string, (hml, int)>
   if ((hc_peek(s, pos) == "Z") || (hc_peek(s, pos) == "z")) then
     hc_validated_datetime((((date_str ++ "T") ++ time_str) ++ "Z"), (pos + 1))
   else if ((hc_peek(s, pos) == "+") || (hc_peek(s, pos) == "-")) then hc_try_parse_tz_offset(s, pos, ((date_str ++ "T") ++ time_str)) else hc_validated_datetime(((date_str ++ "T") ++ time_str), pos)
 
 // .hc:311
-fun hc_finish_datetime_frac(s : string, pos : int, date_str : string, time_str : string)
+noinline fun hc_finish_datetime_frac(s : string, pos : int, date_str : string, time_str : string)
   val (f, p2) = hc_parse_int_digits(s, pos, "")
   hc_parse_datetime_offset(s, p2, date_str, ((time_str ++ ".") ++ f))
 
 // .hc:316
-fun hc_finish_datetime(s : string, pos : int, date_str : string, time_str : string)
+noinline fun hc_finish_datetime(s : string, pos : int, date_str : string, time_str : string)
   if (hc_peek(s, pos) == ".") then hc_finish_datetime_frac(s, (pos + 1), date_str, time_str) else hc_parse_datetime_offset(s, pos, date_str, time_str)
 
 // .hc:321
-fun hc_try_parse_datetime_time(s : string, pos : int, date_str : string)
+noinline fun hc_try_parse_datetime_time(s : string, pos : int, date_str : string)
   if ((pos + 8) > s.count) then
     Left("incomplete time in datetime")
   else if (((((((!(hc_hml_is_digit(hc_peek(s, pos))) || !(hc_hml_is_digit(hc_peek(s, (pos + 1))))) || (hc_peek(s, (pos + 2)) != ":")) || !(hc_hml_is_digit(hc_peek(s, (pos + 3))))) || !(hc_hml_is_digit(hc_peek(s, (pos + 4))))) || (hc_peek(s, (pos + 5)) != ":")) || !(hc_hml_is_digit(hc_peek(s, (pos + 6))))) || !(hc_hml_is_digit(hc_peek(s, (pos + 7))))) then
@@ -590,7 +590,7 @@ fun hc_try_parse_datetime_time(s : string, pos : int, date_str : string)
     hc_finish_datetime(s, (pos + 8), date_str, time_str)
 
 // .hc:332
-fun hc_try_parse_date(s : string, pos : int, year : string)
+noinline fun hc_try_parse_date(s : string, pos : int, year : string)
   if ((pos + 6) > s.count) then
     Left("incomplete date")
   else if ((((!(hc_hml_is_digit(hc_peek(s, (pos + 1)))) || !(hc_hml_is_digit(hc_peek(s, (pos + 2))))) || (hc_peek(s, (pos + 3)) != "-")) || !(hc_hml_is_digit(hc_peek(s, (pos + 4))))) || !(hc_hml_is_digit(hc_peek(s, (pos + 5))))) then
@@ -600,7 +600,7 @@ fun hc_try_parse_date(s : string, pos : int, year : string)
     if ((hc_peek(s, (pos + 6)) == "T") || (hc_peek(s, (pos + 6)) == "t")) then hc_try_parse_datetime_time(s, (pos + 7), date_str) else hc_validated_datetime(date_str, (pos + 6))
 
 // .hc:353
-fun hc_parse_number_or_duration(s : string, pos : int)
+noinline fun hc_parse_number_or_duration(s : string, pos : int)
   val sign_pos : int = if ((hc_peek(s, pos) == "+") || (hc_peek(s, pos) == "-")) then (pos + 1) else pos
   val sign_str : string = if (hc_peek(s, pos) == "-") then "-" else ""
   if ((hc_peek(s, sign_pos) == "0") && (hc_peek(s, (sign_pos + 1)) == "x")) then
@@ -628,7 +628,7 @@ fun hc_parse_number_or_duration(s : string, pos : int)
         hc_parse_number_rest(s, p2, (sign_str ++ digits_str))
 
 // .hc:387
-fun hc_parse_number_rest(s : string, pos : int, int_part : string)
+noinline fun hc_parse_number_rest(s : string, pos : int, int_part : string)
   if (hc_peek(s, pos) == ".") then
     val (frac, p2) = hc_parse_int_digits(s, (pos + 1), "")
     if (frac.count == 0) then
@@ -647,14 +647,14 @@ fun hc_parse_number_rest(s : string, pos : int, int_part : string)
     Right((HInt(int_part.parse-int.default(0)), pos))
 
 // .hc:409
-fun hc_parse_exponent(s : string, pos : int)
+noinline fun hc_parse_exponent(s : string, pos : int)
   val start : int = if ((hc_peek(s, pos) == "+") || (hc_peek(s, pos) == "-")) then (pos + 1) else pos
   val hc_sign : string = if (hc_peek(s, pos) == "-") then "-" else ""
   val (digits_str, p2) = hc_parse_int_digits(s, start, "")
   ((hc_sign ++ digits_str), p2)
 
 // .hc:415
-fun hc_parse_array(s : string, pos : int, items : list<hml>, text_elems : list<string>)
+noinline fun hc_parse_array(s : string, pos : int, items : list<hml>, text_elems : list<string>)
   val p1 : int = hc_skip_noise(s, pos)
   if (hc_peek(s, p1) == "]") then
     Right((HArray(items), (p1 + 1)))
@@ -669,11 +669,11 @@ fun hc_parse_array(s : string, pos : int, items : list<hml>, text_elems : list<s
         Left(e)
 
 // .hc:428
-fun hc_starts_with_at(s : string, pos : int, target : string) : bool
+noinline fun hc_starts_with_at(s : string, pos : int, target : string) : bool
   if ((pos + target.count) > s.count) then False else (s.list.drop(pos).take(((pos + target.count)) - (pos)).string == target)
 
 // .hc:437
-fun hc_parse_string_value(s : string, p : int)
+noinline fun hc_parse_string_value(s : string, p : int)
   if hc_starts_with_at(s, p, "\"\"\"") then
     hc_parse_ml_basic_string(s, (p + 3), "")
   else
@@ -684,7 +684,7 @@ fun hc_parse_string_value(s : string, p : int)
         Left(e)
 
 // .hc:446
-fun hc_parse_literal_value(s : string, p : int)
+noinline fun hc_parse_literal_value(s : string, p : int)
   if hc_starts_with_at(s, p, "\'\'\'") then
     hc_parse_ml_literal_string(s, (p + 3), "")
   else
@@ -723,12 +723,12 @@ noinline fun hc_parse_value(s : string, pos : int, text_elems : list<string>)
     Left(((("unexpected character '" ++ hc_peek(s, p)) ++ "' at position ") ++ show(p)))
 
 // .hc:491
-fun hc_parse_ml_basic_string(s : string, pos : int, acc : string)
+noinline fun hc_parse_ml_basic_string(s : string, pos : int, acc : string)
   val start : int = if (hc_peek(s, pos) == "\n") then (pos + 1) else if ((hc_peek(s, pos) == "\r") && (hc_peek(s, (pos + 1)) == "\n")) then (pos + 2) else pos
   hc_parse_ml_basic_body(s, start, acc)
 
 // .hc:498
-fun hc_parse_ml_basic_escape(s : string, pos : int, acc : string)
+noinline fun hc_parse_ml_basic_escape(s : string, pos : int, acc : string)
   if ((pos + 1) >= s.count) then
     Left("unterminated escape in multi-line string")
   else
@@ -754,7 +754,7 @@ fun hc_parse_ml_basic_escape(s : string, pos : int, acc : string)
         hc_parse_ml_basic_body(s, (pos + 2), ((acc ++ "\\") ++ next))
 
 // .hc:515
-fun hc_parse_ml_basic_body(s : string, pos : int, acc : string)
+noinline fun hc_parse_ml_basic_body(s : string, pos : int, acc : string)
   if (pos >= s.count) then
     Left("unterminated multi-line string")
   else if hc_starts_with_at(s, pos, "\"\"\"") then
@@ -762,18 +762,18 @@ fun hc_parse_ml_basic_body(s : string, pos : int, acc : string)
   else if (hc_peek(s, pos) == "\\") then hc_parse_ml_basic_escape(s, pos, acc) else hc_parse_ml_basic_body(s, (pos + 1), (acc ++ hc_peek(s, pos)))
 
 // .hc:524
-fun hc_parse_ml_literal_string(s : string, pos : int, acc : string)
+noinline fun hc_parse_ml_literal_string(s : string, pos : int, acc : string)
   val start : int = if (hc_peek(s, pos) == "\n") then (pos + 1) else if ((hc_peek(s, pos) == "\r") && (hc_peek(s, (pos + 1)) == "\n")) then (pos + 2) else pos
   hc_parse_ml_literal_body(s, start, acc)
 
 // .hc:530
-fun hc_parse_ml_literal_body(s : string, pos : int, acc : string)
+noinline fun hc_parse_ml_literal_body(s : string, pos : int, acc : string)
   if (pos >= s.count) then
     Left("unterminated multi-line literal string")
   else if hc_starts_with_at(s, pos, "\'\'\'") then Right((HStr(acc), (pos + 3))) else hc_parse_ml_literal_body(s, (pos + 1), (acc ++ hc_peek(s, pos)))
 
 // .hc:542
-fun hc_parse_element_name(s : string, pos : int, acc : string)
+noinline fun hc_parse_element_name(s : string, pos : int, acc : string)
   match hc_parse_bare_key(s, pos, "")
     Right((k, p2)) ->
       val name = (acc ++ k)
@@ -782,7 +782,7 @@ fun hc_parse_element_name(s : string, pos : int, acc : string)
       Left(e)
 
 // .hc:549
-fun hc_parse_attributes(s : string, pos : int, attrs : list<(string, hml)>, text_elems : list<string>)
+noinline fun hc_parse_attributes(s : string, pos : int, attrs : list<(string, hml)>, text_elems : list<string>)
   val p1 : int = hc_skip_noise(s, pos)
   if (hc_peek(s, p1) == ")") then
     Right((attrs, (p1 + 1)))
@@ -805,7 +805,7 @@ fun hc_parse_attributes(s : string, pos : int, attrs : list<(string, hml)>, text
         Left(e)
 
 // .hc:586
-fun hc_is_elem_named(node : hmlnode, name : string) : bool
+noinline fun hc_is_elem_named(node : hmlnode, name : string) : bool
   match node
     NElem(HElement(n, _, _)) ->
       (n == name)
@@ -813,7 +813,7 @@ fun hc_is_elem_named(node : hmlnode, name : string) : bool
       False
 
 // .hc:590
-fun hc_has_elem_named(nodes : list<hmlnode>, name : string)
+noinline fun hc_has_elem_named(nodes : list<hmlnode>, name : string)
   match nodes
     Nil ->
       False
@@ -821,11 +821,11 @@ fun hc_has_elem_named(nodes : list<hmlnode>, name : string)
       if hc_is_elem_named(first, name) then True else hc_has_elem_named(rest, name)
 
 // .hc:599
-fun hc_add_if_missing(items : list<string>, item : string)
+noinline fun hc_add_if_missing(items : list<string>, item : string)
   if hc_list_contains(items, item) then items else (items ++ [item])
 
 // .hc:603
-fun hc_first_segment(segments : list<string>) : string
+noinline fun hc_first_segment(segments : list<string>) : string
   match segments
     Cons(s, _) ->
       s
@@ -833,7 +833,7 @@ fun hc_first_segment(segments : list<string>) : string
       ""
 
 // .hc:606
-fun hc_hml_elem_name(v : hml) : string
+noinline fun hc_hml_elem_name(v : hml) : string
   match v
     HElement(n, _, _) ->
       n
@@ -841,7 +841,7 @@ fun hc_hml_elem_name(v : hml) : string
       ""
 
 // .hc:613
-fun hc_merge_two_elems(existing : hmlnode, new_body : list<hmlnode>)
+noinline fun hc_merge_two_elems(existing : hmlnode, new_body : list<hmlnode>)
   match existing
     NElem(HElement(n, a, b)) ->
       NElem(HElement(n, a, hc_merge_body((b ++ new_body))))
@@ -849,7 +849,7 @@ fun hc_merge_two_elems(existing : hmlnode, new_body : list<hmlnode>)
       existing
 
 // .hc:622
-fun hc_try_merge_elem(nodes : list<hmlnode>, name : string, attrs : list<(string, hml)>, body : list<hmlnode>, checked : list<hmlnode>)
+noinline fun hc_try_merge_elem(nodes : list<hmlnode>, name : string, attrs : list<(string, hml)>, body : list<hmlnode>, checked : list<hmlnode>)
   match nodes
     Nil ->
       (checked ++ [NElem(HElement(name, attrs, body))])
@@ -857,7 +857,7 @@ fun hc_try_merge_elem(nodes : list<hmlnode>, name : string, attrs : list<(string
       if hc_is_elem_named(first, name) then ((checked ++ [hc_merge_two_elems(first, body)]) ++ rest) else hc_try_merge_elem(rest, name, attrs, body, (checked ++ [first]))
 
 // .hc:634
-fun hc_insert_or_merge(acc : list<hmlnode>, node : hmlnode)
+noinline fun hc_insert_or_merge(acc : list<hmlnode>, node : hmlnode)
   match node
     NElem(HElement(name, attrs, body)) ->
       hc_try_merge_elem(acc, name, attrs, body, [])
@@ -865,7 +865,7 @@ fun hc_insert_or_merge(acc : list<hmlnode>, node : hmlnode)
       (acc ++ [node])
 
 // .hc:641
-fun hc_merge_body_acc(remaining : list<hmlnode>, acc : list<hmlnode>)
+noinline fun hc_merge_body_acc(remaining : list<hmlnode>, acc : list<hmlnode>)
   match remaining
     Nil ->
       acc
@@ -873,7 +873,7 @@ fun hc_merge_body_acc(remaining : list<hmlnode>, acc : list<hmlnode>)
       hc_merge_body_acc(rest, hc_insert_or_merge(acc, node))
 
 // .hc:649
-fun hc_merge_body(nodes : list<hmlnode>)
+noinline fun hc_merge_body(nodes : list<hmlnode>)
   hc_merge_body_acc(nodes, [])
 
 // .hc:653
@@ -917,7 +917,7 @@ noinline fun hc_parse_body(s : string, pos : int, nodes : list<hmlnode>, text_el
         Left(("unexpected content in body at position " ++ show(p1)))
 
 // .hc:693
-fun hc_is_text_elem(name : string, text_elems : list<string>)
+noinline fun hc_is_text_elem(name : string, text_elems : list<string>)
   match text_elems
     Nil ->
       False
@@ -925,7 +925,7 @@ fun hc_is_text_elem(name : string, text_elems : list<string>)
       if (x == name) then True else hc_is_text_elem(name, rest)
 
 // .hc:701
-fun hc_collect_text_run(s : string, pos : int, acc : string, text_elems : list<string>)
+noinline fun hc_collect_text_run(s : string, pos : int, acc : string, text_elems : list<string>)
   if (pos >= s.count) then
     (if (acc == "") then [] else [NText(acc)], pos)
   else if (hc_peek(s, pos) == "}") then
@@ -944,7 +944,7 @@ fun hc_collect_text_run(s : string, pos : int, acc : string, text_elems : list<s
     hc_collect_text_run(s, (pos + 1), (acc ++ hc_peek(s, pos)), text_elems)
 
 // .hc:719
-fun hc_try_inline_element(s : string, pos : int, text_elems : list<string>)
+noinline fun hc_try_inline_element(s : string, pos : int, text_elems : list<string>)
   val p1 : int = (pos + 1)
   match hc_parse_element_name(s, p1, "")
     Right((name, p2)) ->
@@ -973,7 +973,7 @@ fun hc_try_inline_element(s : string, pos : int, text_elems : list<string>)
       Nothing
 
 // .hc:747
-fun hc_try_text_property(s : string, pos : int, text_elems : list<string>)
+noinline fun hc_try_text_property(s : string, pos : int, text_elems : list<string>)
   match hc_parse_bare_key(s, pos, "")
     Right((key, p2)) ->
       val p3 = hc_skip_ws(s, p2)
@@ -990,7 +990,7 @@ fun hc_try_text_property(s : string, pos : int, text_elems : list<string>)
       Nothing
 
 // .hc:761
-fun hc_parse_text_body(s : string, pos : int, nodes : list<hmlnode>, text_elems : list<string>)
+noinline fun hc_parse_text_body(s : string, pos : int, nodes : list<hmlnode>, text_elems : list<string>)
   val p1 : int = hc_skip_ws(s, pos)
   if (p1 >= s.count) then
     Left("unterminated text body (missing '}')")
@@ -1053,11 +1053,11 @@ noinline fun hc_parse_element(s : string, pos : int, text_elems : list<string>)
       Left(e)
 
 // .hc:826
-fun hc_parse_inline_element(s : string, pos : int, text_elems : list<string>)
+noinline fun hc_parse_inline_element(s : string, pos : int, text_elems : list<string>)
   hc_parse_element(s, pos, text_elems)
 
 // .hc:835
-fun hc_parse_text_names(s : string, pos : int, names : list<string>)
+noinline fun hc_parse_text_names(s : string, pos : int, names : list<string>)
   val p1 : int = hc_skip_ws(s, pos)
   if ((p1 >= s.count) || hc_is_newline(hc_peek(s, p1))) then
     (names, p1)
@@ -1071,7 +1071,7 @@ fun hc_parse_text_names(s : string, pos : int, names : list<string>)
         (names, p1)
 
 // .hc:844
-fun hc_parse_text_directive(s : string, pos : int)
+noinline fun hc_parse_text_directive(s : string, pos : int)
   if !(hc_starts_with_at(s, pos, "#text")) then
     Nothing
   else
@@ -1083,11 +1083,11 @@ fun hc_parse_text_directive(s : string, pos : int)
       Nothing
 
 // .hc:863
-fun hc_default_text_elems() : list<string>
+noinline fun hc_default_text_elems() : list<string>
   ["body", "p", "text"]
 
 // .hc:865
-fun hc_parse_document(s : string, pos : int, nodes : list<hmlnode>, text_elems : list<string>, dotted_names : list<string>)
+noinline fun hc_parse_document(s : string, pos : int, nodes : list<hmlnode>, text_elems : list<string>, dotted_names : list<string>)
   val p1 : int = hc_skip_noise(s, pos)
   if (p1 >= s.count) then
     Right(nodes)
@@ -1136,23 +1136,23 @@ fun hc_parse_document(s : string, pos : int, nodes : list<hmlnode>, text_elems :
         Left(("unexpected content at position " ++ show(p1)))
 
 // .hc:918
-pub fun hc_hml_parse(input : string)
+pub noinline fun hc_hml_parse(input : string)
   hc_parse_document(input, 0, [], hc_default_text_elems(), [])
 
 // .hc:928
-fun hc_find_last_slash(s : string, pos : int, last_end : int)
+noinline fun hc_find_last_slash(s : string, pos : int, last_end : int)
   if (pos >= s.count) then last_end else if (hc_peek(s, pos) == "/") then hc_find_last_slash(s, (pos + 1), (pos + 1)) else hc_find_last_slash(s, (pos + 1), last_end)
 
 // .hc:933
-fun hc_dir_of_path(hc_path : string)
+noinline fun hc_dir_of_path(hc_path : string)
   hc_path.list.drop(0).take((hc_find_last_slash(hc_path, 0, 0)) - (0)).string
 
 // .hc:934
-fun hc_resolve_include_path(base_dir : string, rel : string) : string
+noinline fun hc_resolve_include_path(base_dir : string, rel : string) : string
   (base_dir ++ rel)
 
 // .hc:938
-fun hc_list_contains(items : list<string>, target : string)
+noinline fun hc_list_contains(items : list<string>, target : string)
   match items
     Nil ->
       False
@@ -1160,7 +1160,7 @@ fun hc_list_contains(items : list<string>, target : string)
       if (x == target) then True else hc_list_contains(rest, target)
 
 // .hc:945
-fun hc_parse_include_path(s : string, pos : int)
+noinline fun hc_parse_include_path(s : string, pos : int)
   if !(hc_starts_with_at(s, pos, "#include")) then
     Nothing
   else
@@ -1175,7 +1175,7 @@ fun hc_parse_include_path(s : string, pos : int)
       Nothing
 
 // .hc:957
-fun hc_parse_namespace_directive(s : string, pos : int)
+noinline fun hc_parse_namespace_directive(s : string, pos : int)
   if !(hc_starts_with_at(s, pos, "#namespace")) then
     Nothing
   else
@@ -1199,7 +1199,7 @@ fun hc_parse_namespace_directive(s : string, pos : int)
         Nothing
 
 // .hc:981
-fun hc_include_file_nodes(s : string, p2 : int, content : string, full_path : string, nodes : list<hmlnode>, base_dir : string, seen : list<string>, text_elems : list<string>, dotted_names : list<string>)
+noinline fun hc_include_file_nodes(s : string, p2 : int, content : string, full_path : string, nodes : list<hmlnode>, base_dir : string, seen : list<string>, text_elems : list<string>, dotted_names : list<string>)
   val inc_base : string = hc_dir_of_path(full_path)
   match hc_parse_file_doc(content, 0, [], inc_base, (seen ++ [full_path]), text_elems, [])
     Right(inc_nodes) ->
@@ -1208,7 +1208,7 @@ fun hc_include_file_nodes(s : string, p2 : int, content : string, full_path : st
       Left(e)
 
 // .hc:993
-fun hc_parse_file_doc(s : string, pos : int, nodes : list<hmlnode>, base_dir : string, seen : list<string>, text_elems : list<string>, dotted_names : list<string>)
+noinline fun hc_parse_file_doc(s : string, pos : int, nodes : list<hmlnode>, base_dir : string, seen : list<string>, text_elems : list<string>, dotted_names : list<string>)
   val p1 : int = hc_skip_noise(s, pos)
   if (p1 >= s.count) then
     Right(nodes)
@@ -1268,12 +1268,12 @@ fun hc_parse_file_doc(s : string, pos : int, nodes : list<hmlnode>, base_dir : s
         Left(("unexpected content at position " ++ show(p1)))
 
 // .hc:1057
-pub fun hc_hml_parse_file_content(content : string, hc_path : string)
+pub noinline fun hc_hml_parse_file_content(content : string, hc_path : string)
   val base : string = hc_dir_of_path(hc_path)
   hc_parse_file_doc(content, 0, [], base, [hc_path], hc_default_text_elems(), [])
 
 // .hc:1065
-pub fun hc_hml_parse_file(hc_path : string)
+pub noinline fun hc_hml_parse_file(hc_path : string)
   match hc-file-read(hc_path.path)
     Right(content) ->
       hc_hml_parse_file_content(content, hc_path)

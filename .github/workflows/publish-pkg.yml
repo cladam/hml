@@ -51,6 +51,38 @@ jobs:
           echo "dir=$PKG_DIR" >> $GITHUB_OUTPUT
           echo "Publishing: $PKG_NAME @ $PKG_VERSION"
 
+      - name: Install Koka
+        run: |
+          curl -sSL https://github.com/koka-lang/koka/releases/latest/download/install.sh | sudo sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install hica
+        run: |
+          curl -fsSL https://www.hica.dev/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Generate and optimize Koka files
+        run: |
+          echo "Generating Koka files..."
+          hica build src/main.hc --generate
+          
+          echo "Optimizing parser..."
+          python3 -c "
+          with open('src/parser.kk', 'r') as f:
+              content = f.read()
+          content = content.replace('fun hc_parse_value(', 'noinline fun hc_parse_value(')
+          content = content.replace('fun hc_parse_body(', 'noinline fun hc_parse_body(')
+          content = content.replace('fun hc_parse_element(', 'noinline fun hc_parse_element(')
+          content = content.replace('pub fun ', 'fun ')
+          content = content.replace('fun hc_hml_parse(', 'pub fun hc_hml_parse(')
+          content = content.replace('fun hc_hml_parse_file_content(', 'pub fun hc_hml_parse_file_content(')
+          content = content.replace('fun hc_hml_parse_file(', 'pub fun hc_hml_parse_file(')
+          with open('src/parser.kk', 'w') as f:
+              f.write(content)
+          "
+          echo "Cleaning temporary build artifacts..."
+          hica clean
+
       - name: Create tarball
         run: |
           PKG_DIR="${{ steps.meta.outputs.dir }}"
